@@ -19,19 +19,12 @@ export interface CreateOrderResponse {
 export const reportsApi = {
     getAll: async (): Promise<Report[]> => {
         try {
-            // Try to fetch from Edge Function first (as per 1.0 logic)
+            // Fetch from Edge Function only
             const { data, error } = await supabase.functions.invoke('get-reports');
 
             if (error) {
-                console.warn('Error fetching reports from Edge Function, falling back to table select:', error);
-                // Fallback to table select if function fails (or dev environment issue)
-                const { data: tableData, error: tableError } = await supabase
-                    .from('reports')
-                    .select('*')
-                    .order('created_at', { ascending: false });
-
-                if (tableError) throw tableError;
-                return (tableData || []).map(transformReport);
+                console.warn('Error fetching reports from Edge Function:', error);
+                throw error;
             }
 
             return (data?.reports || []).map(transformReport);
@@ -81,18 +74,22 @@ export const reportsApi = {
     },
 
     checkOrderStatus: async (orderId: string): Promise<string> => {
-        const { data, error } = await supabase
-            .from('orders')
-            .select('status')
-            .eq('id', orderId)
-            .single();
+        try {
+            // Check order status through Edge Function
+            const { data, error } = await supabase.functions.invoke('get-order-status', {
+                body: { order_id: orderId }
+            });
 
-        if (error) {
-            console.error('Error checking order status:', error);
+            if (error) {
+                console.error('Error checking order status:', error);
+                return 'pending';
+            }
+
+            return data?.status || 'pending';
+        } catch (err) {
+            console.error('Error checking order status:', err);
             return 'pending';
         }
-
-        return data?.status || 'pending';
     }
 };
 
