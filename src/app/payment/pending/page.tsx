@@ -3,9 +3,9 @@
 import { Box, Typography, Button } from '@mui/material';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 
-export default function PendingPage() {
+function PendingContent() {
     const searchParams = useSearchParams();
     // Check for MercadoPago external_reference parameter (maps to order_id) or direct order_id
     const orderId = searchParams.get('external_reference') || searchParams.get('order_id');
@@ -33,5 +33,13 @@ export default function PendingPage() {
                 Volver al inicio
             </Button>
         </Box>
+    );
+}
+
+export default function PendingPage() {
+    return (
+        <Suspense fallback={<Typography>Cargando...</Typography>}>
+            <PendingContent />
+        </Suspense>
     );
 }
