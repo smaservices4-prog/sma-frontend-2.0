@@ -113,7 +113,7 @@ function PaypalCheckout({ width = '100%', onLoad }: PaypalCheckoutProps) {
             }
 
             if (status === 'failed') {
-                router.push('/payment/error');
+                router.push('/payment/failure');
                 return;
             }
 

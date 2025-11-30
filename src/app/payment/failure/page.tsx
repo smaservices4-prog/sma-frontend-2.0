@@ -5,10 +5,11 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useState, Suspense } from 'react';
 
-function PendingContent() {
+function FailureContent() {
     const searchParams = useSearchParams();
     // Check for MercadoPago external_reference parameter (maps to order_id) or direct order_id
     const orderId = searchParams.get('external_reference') || searchParams.get('order_id');
+    const errorMessage = searchParams.get('error') || searchParams.get('message');
     const [displayOrderId, setDisplayOrderId] = useState<string | null>(null);
 
     useEffect(() => {
@@ -18,28 +19,33 @@ function PendingContent() {
     }, [orderId]);
     return (
         <Box sx={{ textAlign: 'center', mt: 8, p: 2 }}>
-            <Typography variant="h4" gutterBottom color="warning.main" fontWeight="bold">
-                Pago Pendiente
+            <Typography variant="h4" gutterBottom color="error.main" fontWeight="bold">
+                ¡Error en el Pago!
             </Typography>
             <Typography variant="body1" sx={{ mb: 2 }}>
-                Tu pago está siendo procesado. Te notificaremos cuando se complete.
+                Lo sentimos, hubo un problema al procesar tu pago.
             </Typography>
+            {errorMessage && (
+                <Typography variant="body2" sx={{ mb: 2, color: 'text.secondary' }}>
+                    Detalles del error: {errorMessage}
+                </Typography>
+            )}
             {displayOrderId && (
                 <Typography variant="body2" sx={{ mt: 2, color: 'text.secondary' }}>
                     ID de la Orden: {displayOrderId}
                 </Typography>
             )}
-            <Button component={Link} href="/" variant="contained" sx={{ mt: 4 }}>
-                Volver al inicio
+            <Button component={Link} href="/cart" variant="contained" color="primary" sx={{ mt: 4 }}>
+                Volver al carrito
             </Button>
         </Box>
     );
 }
 
-export default function PendingPage() {
+export default function FailurePage() {
     return (
         <Suspense fallback={<Typography>Cargando...</Typography>}>
-            <PendingContent />
+            <FailureContent />
         </Suspense>
     );
 }
