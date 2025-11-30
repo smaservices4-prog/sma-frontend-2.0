@@ -8,8 +8,18 @@ export async function GET(request: Request) {
 
     if (code) {
         const cookieStore = await cookies();
-        const supabase = createRouteHandlerClient({ cookies: async () => cookieStore });
-        await supabase.auth.exchangeCodeForSession(code);
+        const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+        
+        try {
+            const { error } = await supabase.auth.exchangeCodeForSession(code);
+            if (error) {
+                console.error('Auth exchange error:', error);
+                return NextResponse.redirect(`${requestUrl.origin}/login?error=${encodeURIComponent(error.message)}`);
+            }
+        } catch (error) {
+            console.error('Auth callback exception:', error);
+            return NextResponse.redirect(`${requestUrl.origin}/login?error=auth_callback_exception`);
+        }
     }
 
     // URL to redirect to after sign in process completes
