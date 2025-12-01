@@ -101,7 +101,7 @@ export default function ReportCard({ report }: ReportCardProps) {
 
                 <Box sx={{ mt: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <Typography variant="h6" color="primary.main" sx={{ fontWeight: 700 }}>
-                        {!purchased ? `${currencySymbol}${price}` : 'Descargar'}
+                        {!purchased ? `${currencySymbol}${price}` : 'Leer'}
                     </Typography>
 
                     <Button

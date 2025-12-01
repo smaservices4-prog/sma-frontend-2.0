@@ -2,9 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { reportsApi } from '@/api/reports';
-import SecurePdfViewer from '@/components/reports/SecurePdfViewer';
 import { Box, CircularProgress, Typography, Container } from '@mui/material';
+
+const SecurePdfViewer = dynamic(() => import('@/components/reports/SecurePdfViewer'), {
+    ssr: false,
+    loading: () => <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}><CircularProgress /></Box>
+});
 
 export default function ReportReaderPage() {
     const params = useParams();
@@ -41,4 +46,5 @@ export default function ReportReaderPage() {
 
     return <SecurePdfViewer url={url} />;
 }
+
 
