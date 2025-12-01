@@ -90,6 +90,27 @@ export const reportsApi = {
             console.error('Error checking order status:', err);
             return 'pending';
         }
+    },
+
+    getReportFile: async (reportId: string): Promise<{ success: boolean; report?: { file_url: string; title: string }; error?: string }> => {
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                return { success: false, error: 'AUTH_REQUIRED' };
+            }
+
+            const { data, error } = await supabase.functions.invoke('get-report-file', {
+                body: { report_id: reportId }
+            });
+
+            if (error) {
+                throw error;
+            }
+            return data;
+        } catch (err: any) {
+            console.error('Error fetching report file:', err);
+            return { success: false, error: err.message || 'Failed to get report file' };
+        }
     }
 };
 
