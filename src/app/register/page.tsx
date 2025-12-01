@@ -7,6 +7,7 @@ import {
     IconButton, InputAdornment
 } from '@mui/material';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
@@ -45,6 +46,8 @@ const HiddenMainButton = ({ buttonRef }: { buttonRef: React.Ref<HTMLButtonElemen
 );
 
 export default function RegisterPage() {
+    const router = useRouter();
+    const searchParams = useSearchParams();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -123,7 +126,8 @@ export default function RegisterPage() {
     };
 
     const handleGoogleSuccess = () => {
-        // Redirect handled by GoogleSignInButton logic (window.location.href = '/')
+        const returnTo = searchParams.get('returnTo');
+        router.push(returnTo ? decodeURIComponent(returnTo) : '/');
     };
 
     const handleGoogleError = (errorMessage: string) => {
