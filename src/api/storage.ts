@@ -20,6 +20,20 @@ export interface UploadFileRequest {
     };
 }
 
+export interface UpdateMetadataRequest {
+    action: 'updateMetadata';
+    report_id: string;
+    report_metadata: {
+        title: string;
+        month: string;
+        prices: {
+            currency: string;
+            amount: number;
+        }[];
+        preview_url?: string;
+    };
+}
+
 export const storageApi = {
     uploadFileWithMetadata: async (data: UploadFileRequest) => {
         const { data: responseData, error } = await supabase.functions.invoke('admin-storage', {
@@ -63,5 +77,38 @@ export const storageApi = {
 
         if (error) throw error;
         return data;
+    },
+
+    updateMetadata: async (reportId: string, metadata: UpdateMetadataRequest['report_metadata']) => {
+        const { data, error } = await supabase.functions.invoke('admin-storage', {
+            body: {
+                action: 'updateMetadata',
+                report_id: reportId,
+                report_metadata: metadata
+            }
+        });
+
+        if (error) throw error;
+        return data;
+    },
+
+    verifyAdmin: async (): Promise<boolean> => {
+        try {
+            const { data, error } = await supabase.functions.invoke('admin-storage', {
+                body: {
+                    action: 'verifyAdmin'
+                }
+            });
+            
+            if (error) {
+                console.error('Admin verification failed:', error);
+                return false;
+            }
+            
+            return data?.is_admin === true;
+        } catch (err) {
+            console.error('Admin verification error:', err);
+            return false;
+        }
     }
 };
