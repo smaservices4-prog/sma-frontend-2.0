@@ -11,10 +11,11 @@ import {
     Chip,
     useTheme,
 } from '@mui/material';
-import { ShoppingCart, Download, Check } from '@mui/icons-material';
+import { ShoppingCart, Download, Check, Visibility } from '@mui/icons-material';
 import { Report } from '@/types';
 import { useCurrency } from '@/context/CurrencyContext';
 import { useCart } from '@/context/CartContext';
+import { useRouter } from 'next/navigation';
 
 interface ReportCardProps {
     report: Report;
@@ -24,6 +25,7 @@ export default function ReportCard({ report }: ReportCardProps) {
     const theme = useTheme();
     const { selectedCurrency } = useCurrency();
     const { addToCart, removeFromCart, isInCart } = useCart();
+    const router = useRouter();
 
     const priceObj = report.prices.find((p) => p.currency === selectedCurrency) || report.prices[0];
     const price = priceObj?.amount || 0;
@@ -34,8 +36,7 @@ export default function ReportCard({ report }: ReportCardProps) {
 
     const handleAction = () => {
         if (purchased) {
-            // Download logic
-            console.log('Download report', report.id);
+            router.push(`/reports/read/${report.id}`);
         } else if (inCart) {
             removeFromCart(report.id);
         } else {
@@ -100,21 +101,21 @@ export default function ReportCard({ report }: ReportCardProps) {
 
                 <Box sx={{ mt: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <Typography variant="h6" color="primary.main" sx={{ fontWeight: 700 }}>
-                        {!purchased ? `${currencySymbol}${price}` : 'Descargar'}
+                        {!purchased ? `${currencySymbol}${price}` : 'Leer'}
                     </Typography>
 
                     <Button
                         variant={inCart ? "outlined" : "contained"}
                         color={purchased ? "success" : "primary"}
                         onClick={handleAction}
-                        startIcon={purchased ? <Download /> : (inCart ? <ShoppingCart /> : <ShoppingCart />)}
+                        startIcon={purchased ? <Visibility /> : (inCart ? <ShoppingCart /> : <ShoppingCart />)}
                         size="small"
                         sx={{
                             minWidth: 120,
                             fontWeight: 600,
                         }}
                     >
-                        {purchased ? 'Bajar' : (inCart ? 'Quitar' : 'Agregar')}
+                        {purchased ? 'Leer' : (inCart ? 'Quitar' : 'Agregar')}
                     </Button>
                 </Box>
             </CardContent>

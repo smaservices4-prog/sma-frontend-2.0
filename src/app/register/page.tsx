@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import {
     Box, Button, TextField, Typography, Alert, Link as MuiLink,
     Avatar, CircularProgress, Divider,
@@ -45,7 +45,7 @@ const HiddenMainButton = ({ buttonRef }: { buttonRef: React.Ref<HTMLButtonElemen
     </Button>
 );
 
-export default function RegisterPage() {
+function RegisterContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const [email, setEmail] = useState('');
@@ -347,5 +347,13 @@ export default function RegisterPage() {
                 </Box>
             </Box>
         </AccessLayout>
+    );
+}
+
+export default function RegisterPage() {
+    return (
+        <Suspense fallback={<AuthPageLoader />}>
+            <RegisterContent />
+        </Suspense>
     );
 }
