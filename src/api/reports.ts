@@ -1,6 +1,7 @@
-import { supabase } from '@/lib/supabase';
+import { supabase as defaultSupabase } from '@/lib/supabase';
 import { Report } from '@/types';
 import { mockReports } from './mockData';
+import { SupabaseClient } from '@supabase/supabase-js';
 
 export interface CreateOrderRequest {
     cart: { report_id: string; quantity: number }[];
@@ -17,10 +18,11 @@ export interface CreateOrderResponse {
 }
 
 export const reportsApi = {
-    getAll: async (): Promise<Report[]> => {
+    getAll: async (supabaseClient?: SupabaseClient): Promise<Report[]> => {
+        const client = supabaseClient || defaultSupabase;
         try {
             // Fetch from Edge Function only
-            const { data, error } = await supabase.functions.invoke('get-reports');
+            const { data, error } = await client.functions.invoke('get-reports');
 
             if (error) {
                 console.warn('Error fetching reports from Edge Function:', error);
@@ -34,10 +36,11 @@ export const reportsApi = {
         }
     },
 
-    createOrder: async (orderData: CreateOrderRequest): Promise<CreateOrderResponse> => {
+    createOrder: async (orderData: CreateOrderRequest, supabaseClient?: SupabaseClient): Promise<CreateOrderResponse> => {
+        const client = supabaseClient || defaultSupabase;
         try {
             // Check authentication first
-            const { data: { session } } = await supabase.auth.getSession();
+            const { data: { session } } = await client.auth.getSession();
             if (!session) {
                 return { 
                     success: false, 
@@ -45,7 +48,7 @@ export const reportsApi = {
                 };
             }
 
-            const { data, error } = await supabase.functions.invoke('create-order', {
+            const { data, error } = await client.functions.invoke('create-order', {
                 body: orderData
             });
 
@@ -73,10 +76,11 @@ export const reportsApi = {
         }
     },
 
-    checkOrderStatus: async (orderId: string): Promise<string> => {
+    checkOrderStatus: async (orderId: string, supabaseClient?: SupabaseClient): Promise<string> => {
+        const client = supabaseClient || defaultSupabase;
         try {
             // Check order status through Edge Function
-            const { data, error } = await supabase.functions.invoke('get-order-status', {
+            const { data, error } = await client.functions.invoke('get-order-status', {
                 body: { order_id: orderId }
             });
 
@@ -92,14 +96,15 @@ export const reportsApi = {
         }
     },
 
-    getReportFile: async (reportId: string): Promise<{ success: boolean; report?: { file_url: string; title: string }; error?: string }> => {
+    getReportFile: async (reportId: string, supabaseClient?: SupabaseClient): Promise<{ success: boolean; report?: { file_url: string; title: string }; error?: string }> => {
+        const client = supabaseClient || defaultSupabase;
         try {
-            const { data: { session } } = await supabase.auth.getSession();
+            const { data: { session } } = await client.auth.getSession();
             if (!session) {
                 return { success: false, error: 'AUTH_REQUIRED' };
             }
 
-            const { data, error } = await supabase.functions.invoke('get-report-file', {
+            const { data, error } = await client.functions.invoke('get-report-file', {
                 body: { report_id: reportId }
             });
 

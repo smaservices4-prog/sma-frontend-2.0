@@ -1,50 +1,44 @@
-'use client';
-
-import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import dynamic from 'next/dynamic';
+import { redirect } from 'next/navigation';
 import { reportsApi } from '@/api/reports';
-import { Box, CircularProgress, Typography, Container } from '@mui/material';
+import { createServerClient } from '@/lib/supabase-server';
+import { Typography, Container } from '@mui/material';
+import PdfViewerWrapper from '@/components/reports/PdfViewerWrapper';
 
-const SecurePdfViewer = dynamic(() => import('@/components/reports/SecurePdfViewer'), {
-    ssr: false,
-    loading: () => <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}><CircularProgress /></Box>
-});
-
-export default function ReportReaderPage() {
-    const params = useParams();
-    const router = useRouter();
-    const [url, setUrl] = useState<string | null>(null);
-    const [error, setError] = useState<string | null>(null);
-
-    useEffect(() => {
-        const fetchReport = async () => {
-            const id = Array.isArray(params.id) ? params.id[0] : params.id;
-            if (!id) return;
-
-            const result = await reportsApi.getReportFile(id);
-            
-            if (!result.success) {
-                if (result.error === 'AUTH_REQUIRED') {
-                    router.push('/login');
-                } else {
-                    setError(result.error || 'Error desconocido');
-                }
-                return;
-            }
-
-            if (result.report?.file_url) {
-                setUrl(result.report.file_url);
-            }
-        };
-
-        fetchReport();
-    }, [params.id, router]);
-
-    if (error) return <Container sx={{ py: 8 }}><Typography color="error" align="center">{error}</Typography></Container>;
-    if (!url) return <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}><CircularProgress /></Box>;
-
-    return <SecurePdfViewer url={url} />;
+interface PageProps {
+    params: Promise<{ id: string }>;
 }
 
+export default async function ReportReaderPage({ params }: PageProps) {
+    const { id } = await params;
+    const supabase = await createServerClient();
 
+    // Check authentication & Get Report File in one go (API does auth check too, but good to check session)
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session) {
+        redirect('/login');
+    }
+
+    const result = await reportsApi.getReportFile(id, supabase);
+    
+    if (!result.success) {
+        if (result.error === 'AUTH_REQUIRED') {
+            redirect('/login');
+        }
+        return (
+            <Container sx={{ py: 8 }}>
+                <Typography color="error" align="center">{result.error || 'Error desconocido'}</Typography>
+            </Container>
+        );
+    }
+
+    if (!result.report?.file_url) {
+         return (
+            <Container sx={{ py: 8 }}>
+                <Typography color="error" align="center">No se pudo obtener el archivo del reporte.</Typography>
+            </Container>
+        );
+    }
+
+    return <PdfViewerWrapper url={result.report.file_url} />;
+}
