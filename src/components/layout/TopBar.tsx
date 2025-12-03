@@ -133,8 +133,8 @@ export default function TopBar() {
 
                     {/* Actions */}
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        {/* Currency Selector (Desktop) */}
-                        <Box sx={{ display: { xs: 'none', md: 'block' }, mr: 2 }}>
+                        {/* Currency Selector */}
+                        <Box sx={{ mr: 2 }}>
                             <ToggleButtonGroup
                                 value={selectedCurrency}
                                 exclusive
