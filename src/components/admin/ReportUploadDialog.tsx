@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
     Box,
     Button,
@@ -11,12 +11,13 @@ import {
     DialogActions,
     TextField,
     FormControl,
-    InputLabel,
-    Select,
-    MenuItem,
     Card,
     CardContent,
-    IconButton
+    IconButton,
+    Grid,
+    InputLabel,
+    Select,
+    MenuItem
 } from '@mui/material';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import CloseIcon from '@mui/icons-material/Close';
@@ -28,15 +29,91 @@ interface ReportUploadDialogProps {
     onUploadSuccess: () => void;
 }
 
+interface PriceInput {
+    currency: string;
+    amount: number;
+}
+
 interface ReportMetadata {
     title: string;
     month: string;
-    prices: Array<{
-        currency: string;
-        amount: number;
-    }>;
+    prices: PriceInput[];
     preview_url?: string;
 }
+
+type UploadStatus = 'pending' | 'uploading' | 'success' | 'error';
+
+interface FileEntry {
+    id: string;
+    file: File;
+    metadata: ReportMetadata;
+    status: UploadStatus;
+    error?: string;
+}
+
+const ACCEPTED_TYPES = ['.pdf', '.doc', '.docx', '.xls', '.xlsx'];
+const DEFAULT_PRICES: PriceInput[] = [
+    { currency: 'ARS', amount: 0 },
+    { currency: 'USD', amount: 0 },
+    { currency: 'EUR', amount: 0 }
+];
+
+const getCurrentMonthValue = () => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = `${now.getMonth() + 1}`.padStart(2, '0');
+    return `${y}-${m}`;
+};
+
+const buildFileId = (file: File) => `${file.name}-${file.size}-${file.lastModified}`;
+
+const buildMetadataFromFile = (file: File, pricesTemplate: PriceInput[]): ReportMetadata => {
+    const nameWithoutExtension = file.name.replace(/\.[^/.]+$/, '');
+    return {
+        title: nameWithoutExtension,
+        month: getCurrentMonthValue(),
+        prices: pricesTemplate.map(price => ({ ...price })),
+        preview_url: ''
+    };
+};
+
+const validateFileEntry = (entry: FileEntry): string | null => {
+    if (!entry.metadata.title.trim()) return 'El título es requerido';
+    if (!entry.metadata.month) return 'El mes es requerido';
+    if (!entry.metadata.prices.length) return 'Debes ingresar precios';
+    const invalidPrices = entry.metadata.prices.filter(price => price.amount <= 0);
+    if (invalidPrices.length > 0) {
+        const currencies = invalidPrices.map(p => p.currency).join(', ');
+        return `Los precios deben ser mayor a 0 para: ${currencies}`;
+    }
+
+    const extension = `.${entry.file.name.split('.').pop()?.toLowerCase()}`;
+    if (!ACCEPTED_TYPES.includes(extension)) {
+        return 'Tipo de archivo no soportado. Solo se permiten PDF, DOC, DOCX, XLS, XLSX';
+    }
+
+    return null;
+};
+
+const extractFilesFromDataTransfer = (dataTransfer: DataTransfer): File[] => {
+    const files: File[] = [];
+    if (dataTransfer.items) {
+        for (let i = 0; i < dataTransfer.items.length; i += 1) {
+            const item = dataTransfer.items[i];
+            if (item.kind === 'file') {
+                const file = item.getAsFile();
+                if (file) files.push(file);
+            }
+        }
+    }
+    if (files.length === 0 && dataTransfer.files) {
+        for (let i = 0; i < dataTransfer.files.length; i += 1) {
+            const file = dataTransfer.files[i];
+            if (file) files.push(file);
+        }
+    }
+    return files;
+};
 
 export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: ReportUploadDialogProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -44,33 +121,60 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
 
-    const [selectedFile, setSelectedFile] = useState<File | null>(null);
-    const [reportMetadata, setReportMetadata] = useState<ReportMetadata>({
-        title: '',
-        month: '',
-        prices: [
-            { currency: 'ARS', amount: 0 },
-            { currency: 'USD', amount: 0 },
-            { currency: 'EUR', amount: 0 }
-        ],
-        preview_url: ''
-    });
+    const [selectedEntries, setSelectedEntries] = useState<FileEntry[]>([]);
+    const [defaultPrices, setDefaultPrices] = useState<PriceInput[]>(DEFAULT_PRICES);
     const [isDragging, setIsDragging] = useState(false);
 
-    const handleFileSelect = (file: File) => {
-        setSelectedFile(file);
-        const nameWithoutExtension = file.name.replace(/\.[^/.]+$/, "");
-        setReportMetadata(prev => ({
-            ...prev,
-            title: nameWithoutExtension
-        }));
+    useEffect(() => {
+        if (!open) {
+            // Reset when dialog closes
+            setSelectedEntries([]);
+            setDefaultPrices(DEFAULT_PRICES);
+            setError(null);
+            setSuccess(null);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    }, [open]);
+
+    const addFiles = (incomingFiles: File[]) => {
+        if (incomingFiles.length === 0) return;
+
+        const validFiles: File[] = [];
+        const invalid = new Set<string>();
+
+        incomingFiles.forEach(file => {
+            const extension = `.${file.name.split('.').pop()?.toLowerCase()}`;
+            if (!ACCEPTED_TYPES.includes(extension)) {
+                invalid.add(extension);
+                return;
+            }
+            validFiles.push(file);
+        });
+
+        if (invalid.size > 0) {
+            setError('Tipo de archivo no soportado. Solo se permiten PDF, DOC, DOCX, XLS, XLSX');
+        }
+
+        if (validFiles.length === 0) return;
+
+        setSelectedEntries(prev => {
+            const existingIds = new Set(prev.map(entry => entry.id));
+            const newEntries = validFiles
+                .filter(file => !existingIds.has(buildFileId(file)))
+                .map(file => ({
+                    id: buildFileId(file),
+                    file,
+                    metadata: buildMetadataFromFile(file, defaultPrices),
+                    status: 'pending' as UploadStatus
+                }));
+            return [...prev, ...newEntries];
+        });
     };
 
     const handleInputFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            handleFileSelect(file);
-        }
+        const filesList = e.target.files ? Array.from(e.target.files) : [];
+        addFiles(filesList);
+        if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
     const handleDragEnter = (e: React.DragEvent) => {
@@ -89,120 +193,143 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
         setIsDragging(false);
-
-        const files = e.dataTransfer.files;
-        if (files.length > 0) {
-            const file = files[0];
-            const acceptedTypes = ['.pdf', '.doc', '.docx', '.xls', '.xlsx'];
-            const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
-
-            if (acceptedTypes.includes(fileExtension)) {
-                handleFileSelect(file);
-            } else {
-                setError('Tipo de archivo no soportado. Solo se permiten PDF, DOC, DOCX, XLS, XLSX');
-            }
-        }
+        const filesList = extractFilesFromDataTransfer(e.dataTransfer);
+        addFiles(filesList);
     };
 
-    const handleUploadReport = async () => {
-        if (!selectedFile) {
-            setError('Por favor selecciona un archivo');
-            return;
-        }
+    const handleRemoveSelected = (id: string) => {
+        setSelectedEntries(prev => prev.filter(entry => entry.id !== id));
+    };
 
-        if (!reportMetadata.title.trim()) {
-            setError('El título es requerido');
-            return;
-        }
-        if (!reportMetadata.month) {
-            setError('El mes es requerido');
-            return;
-        }
+    const updateEntryMetadata = (id: string, updater: (meta: ReportMetadata) => ReportMetadata) => {
+        setSelectedEntries(prev =>
+            prev.map(entry =>
+                entry.id === id ? { ...entry, metadata: updater(entry.metadata) } : entry
+            )
+        );
+    };
 
-        const invalidPrices = reportMetadata.prices.filter(price => price.amount <= 0);
-        if (invalidPrices.length > 0) {
-            const currencies = invalidPrices.map(p => p.currency).join(', ');
-            setError(`Los precios deben ser mayor a 0 para: ${currencies}`);
-            return;
-        }
-
-        setUploading(true);
-        setError(null);
-        setSuccess(null);
-
-        try {
-            const arrayBuffer = await selectedFile.arrayBuffer();
-            const uint8Array = new Uint8Array(arrayBuffer);
-            const fileData = Array.from(uint8Array);
-
-            const requestData: UploadFileRequest = {
-                action: "uploadFile",
-                file: {
-                    name: selectedFile.name,
-                    size: selectedFile.size,
-                    type: selectedFile.type
-                },
-                fileData,
-                report_metadata: {
-                    title: reportMetadata.title.trim(),
-                    month: `${reportMetadata.month}-01`,
-                    prices: reportMetadata.prices.map(price => ({
-                        currency: price.currency,
-                        amount: Number(price.amount)
-                    })),
-                    ...(reportMetadata.preview_url?.trim() && { preview_url: reportMetadata.preview_url.trim() })
+    const handleApplyDefaultPricesToAll = () => {
+        setSelectedEntries(prev =>
+            prev.map(entry => ({
+                ...entry,
+                metadata: {
+                    ...entry.metadata,
+                    prices: defaultPrices.map(price => ({ ...price }))
                 }
-            };
-
-            await storageApi.uploadFileWithMetadata(requestData);
-            setSuccess(`Reporte subido correctamente: ${reportMetadata.title}`);
-
-            // Reset form
-            setSelectedFile(null);
-            setReportMetadata({
-                title: '',
-                month: '',
-                prices: [
-                    { currency: 'ARS', amount: 0 },
-                    { currency: 'USD', amount: 0 },
-                    { currency: 'EUR', amount: 0 }
-                ],
-                preview_url: ''
-            });
-            if (fileInputRef.current) fileInputRef.current.value = '';
-            
-            setTimeout(() => {
-                onUploadSuccess();
-                onClose();
-                setSuccess(null);
-            }, 1500);
-
-        } catch (err: any) {
-            setError(err.message || 'Error al subir el reporte');
-        } finally {
-            setUploading(false);
-        }
+            }))
+        );
     };
+
+    const hasValidationErrors = selectedEntries.some(entry => !!validateFileEntry(entry));
 
     const generateMonthOptions = () => {
         const months = [];
+        const monthNames = [
+            'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+            'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+        ];
         const currentYear = new Date().getFullYear();
-        const currentMonth = new Date().getMonth();
+        // Amplio rango (sin límites prácticos para el admin)
+        const startYear = currentYear - 100;
+        const endYear = currentYear + 50;
 
-        for (let year = currentYear; year <= currentYear + 2; year++) {
+        for (let year = startYear; year <= endYear; year++) {
             for (let month = 0; month < 12; month++) {
-                if (year === currentYear && month < currentMonth) continue;
-
                 const monthValue = `${year}-${(month + 1).toString().padStart(2, '0')}`;
-                const monthNames = [
-                    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-                    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-                ];
                 const monthLabel = `${monthNames[month]} ${year}`;
                 months.push({ value: monthValue, label: monthLabel });
             }
         }
         return months;
+    };
+
+    const buildUploadPayload = async (entry: FileEntry): Promise<UploadFileRequest> => {
+        const arrayBuffer = await entry.file.arrayBuffer();
+        const uint8Array = new Uint8Array(arrayBuffer);
+        const fileData = Array.from(uint8Array);
+
+        return {
+            action: 'uploadFile',
+            file: {
+                name: entry.file.name,
+                size: entry.file.size,
+                type: entry.file.type
+            },
+            fileData,
+            report_metadata: {
+                title: entry.metadata.title.trim(),
+                month: `${entry.metadata.month}-01`,
+                prices: entry.metadata.prices.map(price => ({
+                    currency: price.currency,
+                    amount: Number(price.amount)
+                })),
+                ...(entry.metadata.preview_url?.trim() && { preview_url: entry.metadata.preview_url.trim() })
+            }
+        };
+    };
+
+    const handleUploadReports = async () => {
+        setError(null);
+        setSuccess(null);
+
+        if (selectedEntries.length === 0) {
+            setError('Por favor selecciona al menos un archivo');
+            return;
+        }
+
+        const firstError = selectedEntries
+            .map(entry => validateFileEntry(entry))
+            .find(msg => msg !== null);
+
+        if (firstError) {
+            setError(firstError);
+            return;
+        }
+
+        setUploading(true);
+        setSelectedEntries(prev => prev.map(entry => ({ ...entry, status: 'uploading', error: undefined })));
+
+        let successCount = 0;
+        let failureCount = 0;
+
+        for (const entry of selectedEntries) {
+            try {
+                const payload = await buildUploadPayload(entry);
+                await storageApi.uploadFileWithMetadata(payload);
+                successCount += 1;
+                setSelectedEntries(prev =>
+                    prev.map(item =>
+                        item.id === entry.id ? { ...item, status: 'success', error: undefined } : item
+                    )
+                );
+            } catch (err: any) {
+                failureCount += 1;
+                const message = err?.message || 'Error al subir el reporte';
+                setSelectedEntries(prev =>
+                    prev.map(item =>
+                        item.id === entry.id ? { ...item, status: 'error', error: message } : item
+                    )
+                );
+            }
+        }
+
+        if (successCount > 0) {
+            setSuccess(`Subidos ${successCount} de ${selectedEntries.length} archivos`);
+            onUploadSuccess();
+        }
+
+        if (failureCount > 0) {
+            setError('Algunos archivos no se pudieron subir. Revisá los errores e intentá de nuevo.');
+        } else {
+            setTimeout(() => {
+                setSelectedEntries([]);
+                setDefaultPrices(DEFAULT_PRICES);
+                onClose();
+            }, 600);
+        }
+
+        setUploading(false);
     };
 
     return (
@@ -220,9 +347,9 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
                     <Box sx={{ mb: 3 }}>
                         <Card
                             sx={{
-                                backgroundColor: selectedFile ? '#F0F9F0' : isDragging ? '#E8F5E8' : '#FEF9F5',
+                                backgroundColor: selectedEntries.length ? '#F0F9F0' : isDragging ? '#E8F5E8' : '#FEF9F5',
                                 borderRadius: '8px',
-                                border: selectedFile
+                                border: selectedEntries.length
                                     ? '2px solid #4ADE80'
                                     : isDragging
                                         ? '2px solid #4ADE80'
@@ -243,17 +370,18 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
                                     style={{ display: 'none' }}
                                     onChange={handleInputFileChange}
                                     disabled={uploading}
-                                    accept=".pdf,.doc,.docx,.xls,.xlsx"
+                                    accept={ACCEPTED_TYPES.join(',')}
+                                    multiple
                                 />
 
-                                {selectedFile ? (
+                                {selectedEntries.length === 1 ? (
                                     <Box>
                                         <UploadFileIcon sx={{ fontSize: 48, color: '#4ADE80', mb: 1 }} />
                                         <Typography variant="h6" sx={{ color: '#2C1810', fontWeight: 'bold', mb: 1 }}>
-                                            {selectedFile.name}
+                                            {selectedEntries[0].file.name}
                                         </Typography>
                                         <Typography variant="body2" sx={{ color: '#8B6F47', mb: 2 }}>
-                                            {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                                            {(selectedEntries[0].file.size / 1024 / 1024).toFixed(2)} MB
                                         </Typography>
                                         <Button
                                             variant="outlined"
@@ -280,10 +408,15 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
                                             transition: 'color 0.3s ease'
                                         }} />
                                         <Typography variant="h6" sx={{ color: '#2C1810', fontWeight: 'bold', mb: 1 }}>
-                                            {isDragging ? 'Suelta el archivo aquí' : 'Arrastra y suelta o haz clic para seleccionar'}
+                                            {isDragging ? 'Soltá los archivos aquí' : 'Arrastrá y soltá o hacé clic para seleccionar (multi)'}
                                         </Typography>
                                         <Typography variant="body2" sx={{ color: '#8B6F47', mb: 2 }}>
                                             Soporta PDF, DOC, DOCX, XLS, XLSX
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ color: '#4ADE80', fontWeight: 600 }}>
+                                            {selectedEntries.length > 0
+                                                ? `${selectedEntries.length} archivo(s) listos`
+                                                : 'No hay archivos seleccionados'}
                                         </Typography>
                                         <Button
                                             variant="contained"
@@ -308,88 +441,180 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
                         </Card>
                     </Box>
 
-                    {selectedFile && (
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 3 }}>
-                                <TextField
-                                    fullWidth
-                                    label="Título del reporte"
-                                    value={reportMetadata.title}
-                                    onChange={(e) => setReportMetadata(prev => ({ ...prev, title: e.target.value }))}
-                                    disabled={uploading}
-                                    required
-                                    sx={{ flex: 1 }}
-                                />
-
-                                <FormControl sx={{ flex: 1 }} required>
-                                    <InputLabel>Mes del reporte</InputLabel>
-                                    <Select
-                                        value={reportMetadata.month}
-                                        label="Mes del reporte"
-                                        onChange={(e) => setReportMetadata(prev => ({ ...prev, month: e.target.value }))}
-                                        disabled={uploading}
-                                    >
-                                        {generateMonthOptions().map((option) => (
-                                            <MenuItem key={option.value} value={option.value}>
-                                                {option.label}
-                                            </MenuItem>
+                    {selectedEntries.length > 0 && (
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <Card sx={{ border: '1px solid rgba(255, 140, 66, 0.2)' }}>
+                                <CardContent>
+                                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 2 }}>
+                                        Precios por defecto (aplicar a todos)
+                                    </Typography>
+                                    <Grid container spacing={2}>
+                                        {defaultPrices.map((price, idx) => (
+                                            <Grid item xs={12} sm={4} key={price.currency}>
+                                                <TextField
+                                                    fullWidth
+                                                    label={`Precio ${price.currency}`}
+                                                    type="number"
+                                                    value={price.amount || ''}
+                                                    onChange={(e) => {
+                                                        const newPrices = [...defaultPrices];
+                                                        newPrices[idx] = { ...newPrices[idx], amount: Number(e.target.value) };
+                                                        setDefaultPrices(newPrices);
+                                                    }}
+                                                    size="small"
+                                                    disabled={uploading}
+                                                />
+                                            </Grid>
                                         ))}
-                                    </Select>
-                                </FormControl>
-                            </Box>
+                                    </Grid>
+                                    <Button
+                                        variant="outlined"
+                                        sx={{ mt: 2, color: '#FF8C42', borderColor: '#FF8C42' }}
+                                        onClick={handleApplyDefaultPricesToAll}
+                                        disabled={uploading || selectedEntries.length === 0}
+                                    >
+                                        Aplicar a todos
+                                    </Button>
+                                </CardContent>
+                            </Card>
 
-                            <Box>
-                                <Typography variant="h6" sx={{ color: '#2C1810', fontWeight: 'bold', mb: 2 }}>
-                                    Precios por moneda *
-                                </Typography>
-                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                    {reportMetadata.prices.map((price, index) => (
-                                        <Box
-                                            key={price.currency}
-                                            sx={{
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: 2,
-                                                p: 2,
-                                                backgroundColor: '#FEF9F5',
-                                                borderRadius: '8px',
-                                                border: '1px solid rgba(255, 140, 66, 0.2)'
-                                            }}
-                                        >
-                                            <Typography variant="body1" sx={{ fontWeight: 'bold', minWidth: '60px' }}>
-                                                {price.currency}:
-                                            </Typography>
-                                            <TextField
-                                                fullWidth
-                                                label={`Precio en ${price.currency}`}
-                                                type="number"
-                                                value={price.amount || ''}
-                                                onChange={(e) => {
-                                                    const newPrices = [...reportMetadata.prices];
-                                                    newPrices[index] = {
-                                                        ...newPrices[index],
-                                                        amount: Number(e.target.value)
-                                                    };
-                                                    setReportMetadata(prev => ({ ...prev, prices: newPrices }));
-                                                }}
+                            {selectedEntries.map(entry => (
+                                <Card
+                                    key={entry.id}
+                                    sx={{
+                                        border: '1px solid rgba(255, 140, 66, 0.2)',
+                                        borderLeft: '4px solid #FF8C42',
+                                        backgroundColor: '#FEF9F5'
+                                    }}
+                                >
+                                    <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
+                                            <Box>
+                                                <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                                                    {entry.file.name}
+                                                </Typography>
+                                                <Typography variant="caption" sx={{ color: '#8B6F47' }}>
+                                                    {(entry.file.size / 1024 / 1024).toFixed(2)} MB
+                                                </Typography>
+                                            </Box>
+                                            <IconButton
+                                                onClick={() => handleRemoveSelected(entry.id)}
                                                 disabled={uploading}
-                                                required
-                                                size="small"
-                                                sx={{ bgcolor: '#FFFFFF' }}
-                                            />
+                                                sx={{ color: '#E53935' }}
+                                            >
+                                                <CloseIcon />
+                                            </IconButton>
                                         </Box>
-                                    ))}
-                                </Box>
-                            </Box>
 
-                            <TextField
-                                fullWidth
-                                label="URL de vista previa (opcional)"
-                                value={reportMetadata.preview_url}
-                                onChange={(e) => setReportMetadata(prev => ({ ...prev, preview_url: e.target.value }))}
-                                disabled={uploading}
-                                placeholder="https://ejemplo.com/preview.jpg"
-                            />
+                                        <Grid container spacing={2}>
+                                            <Grid item xs={12} md={6}>
+                                                <TextField
+                                                    fullWidth
+                                                    label="Título del reporte"
+                                                    value={entry.metadata.title}
+                                                    onChange={(e) =>
+                                                        updateEntryMetadata(entry.id, meta => ({
+                                                            ...meta,
+                                                            title: e.target.value
+                                                        }))
+                                                    }
+                                                    disabled={uploading}
+                                                    required
+                                                />
+                                            </Grid>
+                                            <Grid item xs={12} md={6}>
+                                                <FormControl
+                                                    fullWidth
+                                                    required
+                                                    sx={{ minWidth: 220 }}
+                                                >
+                                                    <InputLabel>Mes del reporte</InputLabel>
+                                                    <Select
+                                                        value={entry.metadata.month}
+                                                        label="Mes del reporte"
+                                                        onChange={(e) =>
+                                                            updateEntryMetadata(entry.id, meta => ({
+                                                                ...meta,
+                                                                month: e.target.value
+                                                            }))
+                                                        }
+                                                        disabled={uploading}
+                                                        MenuProps={{
+                                                            PaperProps: { sx: { maxHeight: 320 } }
+                                                        }}
+                                                        sx={{
+                                                            height: 48,
+                                                            '& .MuiSelect-select': { display: 'flex', alignItems: 'center' }
+                                                        }}
+                                                    >
+                                                        {generateMonthOptions().map(option => (
+                                                            <MenuItem key={option.value} value={option.value}>
+                                                                {option.label}
+                                                            </MenuItem>
+                                                        ))}
+                                                    </Select>
+                                                </FormControl>
+                                            </Grid>
+                                            <Grid item xs={12}>
+                                                <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#2C1810', mb: 1 }}>
+                                                    Precios por moneda *
+                                                </Typography>
+                                                <Grid container spacing={1}>
+                                                    {entry.metadata.prices.map((price, idx) => (
+                                                        <Grid item xs={12} sm={4} key={price.currency}>
+                                                            <TextField
+                                                                fullWidth
+                                                                label={`${price.currency}`}
+                                                                type="number"
+                                                                value={price.amount || ''}
+                                                                onChange={(e) => {
+                                                                    const newPrice = Number(e.target.value);
+                                                                    updateEntryMetadata(entry.id, meta => {
+                                                                        const newPrices = [...meta.prices];
+                                                                        newPrices[idx] = { ...newPrices[idx], amount: newPrice };
+                                                                        return { ...meta, prices: newPrices };
+                                                                    });
+                                                                }}
+                                                                size="small"
+                                                                disabled={uploading}
+                                                            />
+                                                        </Grid>
+                                                    ))}
+                                                </Grid>
+                                            </Grid>
+                                            <Grid item xs={12}>
+                                                <TextField
+                                                    fullWidth
+                                                    label="URL de vista previa (opcional)"
+                                                    value={entry.metadata.preview_url}
+                                                    onChange={(e) =>
+                                                        updateEntryMetadata(entry.id, meta => ({
+                                                            ...meta,
+                                                            preview_url: e.target.value
+                                                        }))
+                                                    }
+                                                    disabled={uploading}
+                                                    placeholder="https://ejemplo.com/preview.jpg"
+                                                />
+                                            </Grid>
+                                            {entry.status === 'error' && (
+                                                <Grid item xs={12}>
+                                                    <Alert severity="error">
+                                                        {entry.error || 'Error al subir este archivo'}
+                                                    </Alert>
+                                                </Grid>
+                                            )}
+                                            {entry.status === 'success' && (
+                                                <Grid item xs={12}>
+                                                    <Alert severity="success">
+                                                        Subido correctamente
+                                                    </Alert>
+                                                </Grid>
+                                            )}
+                                        </Grid>
+                                    </CardContent>
+                                </Card>
+                            ))}
                         </Box>
                     )}
                 </Box>
@@ -403,9 +628,9 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
                     Cancelar
                 </Button>
                 <Button
-                    onClick={handleUploadReport}
+                    onClick={handleUploadReports}
                     variant="contained"
-                    disabled={uploading || !selectedFile || !reportMetadata.title.trim() || !reportMetadata.month || reportMetadata.prices.some(p => p.amount <= 0)}
+                    disabled={uploading || selectedEntries.length === 0 || hasValidationErrors}
                     sx={{
                         backgroundColor: '#FF8C42',
                         color: '#FFFFFF',
