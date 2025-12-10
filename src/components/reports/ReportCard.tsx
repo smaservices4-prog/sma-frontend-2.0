@@ -18,6 +18,12 @@ import { useCurrency } from '@/context/CurrencyContext';
 import { useCart } from '@/context/CartContext';
 import { useRouter } from 'next/navigation';
 
+function formatMonthLabel(monthIso: string) {
+    const [year, month] = monthIso.split('-');
+    const date = new Date(Number(year), Number(month) - 1, 1);
+    return date.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+}
+
 interface ReportCardProps {
     report: Report;
     adminView?: boolean;
@@ -117,7 +123,7 @@ export default function ReportCard({ report, adminView = false, onEdit, onDelete
                 </Typography>
 
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    {new Date(report.month).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
+                    {formatMonthLabel(report.month)}
                 </Typography>
 
                 <Box sx={{ mt: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

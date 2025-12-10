@@ -29,7 +29,9 @@ export const reportsApi = {
                 throw error;
             }
 
-            return (data?.reports || []).map(transformReport);
+            const transformed = (data?.reports || []).map(transformReport);
+
+            return transformed;
         } catch (err) {
             console.warn('API/Function failed, falling back to mock data:', err);
             return mockReports;

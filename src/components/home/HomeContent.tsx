@@ -4,13 +4,20 @@ import React, { useState, useEffect } from 'react';
 import { Container, Typography, Box, Grid, Pagination, FormControlLabel, Switch, Fab, Skeleton } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import ReportCard from '@/components/reports/ReportCard';
-import Filters from '@/components/reports/Filters';
+import { FiltersModal, FiltersSummary } from '@/components/reports/Filters';
 import { useSearch } from '@/context/SearchContext';
 import { Report } from '@/types';
 import { useAdmin } from '@/hooks/useAdmin';
 import ReportUploadDialog from '@/components/admin/ReportUploadDialog';
 import ReportEditDialog from '@/components/admin/ReportEditDialog';
 import { storageApi } from '@/api/storage';
+import { useFilters } from '@/context/FilterContext';
+
+function getReportYear(monthIso: string): number | null {
+  const year = monthIso.slice(0, 4);
+  const parsed = Number(year);
+  return Number.isNaN(parsed) ? null : parsed;
+}
 
 interface HomeContentProps {
   initialReports: Report[];
@@ -19,10 +26,9 @@ interface HomeContentProps {
 export default function HomeContent({ initialReports }: HomeContentProps) {
   const { searchQuery } = useSearch();
   const { isAdmin, loading: adminLoading } = useAdmin();
+  const { year, status, setSheetOpen } = useFilters();
   
   const [filteredReports, setFilteredReports] = useState<Report[]>(initialReports);
-  const [yearFilter, setYearFilter] = useState<number | ''>('');
-  const [statusFilter, setStatusFilter] = useState<'purchased' | 'available' | 'all'>('all');
 
   // Admin State
   const [isAdminMode, setIsAdminMode] = useState(false);
@@ -71,64 +77,69 @@ export default function HomeContent({ initialReports }: HomeContentProps) {
       );
     }
 
-    if (yearFilter) {
-      result = result.filter((report) => new Date(report.month).getFullYear() === yearFilter);
+    if (year) {
+      result = result.filter((report) => getReportYear(report.month) === year);
     }
 
-    if (statusFilter !== 'all') {
+    if (status !== 'all') {
       // Implement status logic if needed
       // Example: result = result.filter((report) => statusFilter === 'purchased' ? report.purchased : !report.purchased);
     }
 
     setFilteredReports(result);
-  }, [searchQuery, yearFilter, statusFilter, initialReports]);
+  }, [searchQuery, year, status, initialReports]);
 
   return (
-    <Container maxWidth="lg" sx={{ py: 6 }}>
-      {/* Admin Toggle */}
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2, height: 40 }}>
+    <Container maxWidth="lg" sx={{ py: { xs: 3, md: 3.5 } }}>
+      {/* Hero + Admin toggle */}
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: { xs: 'column', md: 'row' },
+          alignItems: { xs: 'flex-start', md: 'center' },
+          justifyContent: 'space-between',
+          gap: 2,
+          mb: { xs: 2.5, md: 3.25 },
+        }}
+      >
+        <Box sx={{ textAlign: { xs: 'left', md: 'left' } }}>
+          <Typography
+            variant="h1"
+            component="h1"
+            gutterBottom
+            sx={{ fontSize: { xs: '2rem', md: '2.75rem' }, mb: 1 }}
+          >
+            Catálogo de Reportes
+          </Typography>
+        </Box>
+
+        <Box sx={{ minHeight: 40 }}>
           {adminLoading ? (
-              <Skeleton variant="rectangular" width={200} height={40} sx={{ borderRadius: 1 }} />
-          ) : isAdmin ? (
+            <Skeleton variant="rectangular" width={160} height={40} sx={{ borderRadius: 1 }} />
+          ) : (
+            isAdmin && (
               <FormControlLabel
-                  control={
-                      <Switch
-                          checked={isAdminMode}
-                          onChange={handleAdminToggle}
-                          color="warning"
-                      />
-                  }
-                  label={
-                      <Typography variant="subtitle2" fontWeight="bold" color={isAdminMode ? "warning.main" : "text.secondary"}>
-                          Modo Administrador
-                      </Typography>
-                  }
+                control={
+                  <Switch
+                    checked={isAdminMode}
+                    onChange={handleAdminToggle}
+                    color="warning"
+                  />
+                }
+                label={
+                  <Typography variant="subtitle2" fontWeight="bold" color={isAdminMode ? "warning.main" : "text.secondary"}>
+                    Modo Administrador
+                  </Typography>
+                }
               />
-          ) : null}
+            )
+          )}
+        </Box>
       </Box>
-
-      {/* Hero Section */}
-      <Box sx={{ mb: 8, textAlign: 'center' }}>
-        <Typography variant="h1" component="h1" gutterBottom sx={{ fontSize: { xs: '2.5rem', md: '3.5rem' } }}>
-          Catálogo de Reportes
-        </Typography>
-        <Typography variant="h5" color="text.secondary" sx={{ maxWidth: 600, mx: 'auto' }}>
-          Accede a información estratégica mensual para la toma de decisiones.
-          {filteredReports.length} reportes disponibles.
-        </Typography>
-      </Box>
-
-      {/* Filters */}
-      <Filters
-        year={yearFilter}
-        setYear={setYearFilter}
-        status={statusFilter}
-        setStatus={setStatusFilter}
-      />
 
       {/* Reports Grid */}
       {filteredReports.length > 0 ? (
-        <Grid container spacing={4}>
+        <Grid container spacing={2.5}>
           {filteredReports.map((report) => (
             <Grid size={{ xs: 12, sm: 6, md: 4 }} key={report.id}>
               <ReportCard 
@@ -153,7 +164,7 @@ export default function HomeContent({ initialReports }: HomeContentProps) {
 
       {/* Pagination (Mock) */}
       {filteredReports.length > 0 && (
-        <Box sx={{ mt: 8, display: 'flex', justifyContent: 'center' }}>
+        <Box sx={{ mt: 5, display: 'flex', justifyContent: 'center' }}>
           <Pagination count={Math.ceil(filteredReports.length / 6) || 1} color="primary" size="large" />
         </Box>
       )}
@@ -186,6 +197,9 @@ export default function HomeContent({ initialReports }: HomeContentProps) {
           report={selectedReport}
           onUpdateSuccess={handleRefresh}
       />
+
+      {/* Mobile filters sheet */}
+      <FiltersModal />
     </Container>
   );
 }

@@ -1,122 +1,134 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import {
     Box,
     Button,
-    Collapse,
+    Chip,
+    Drawer,
     FormControl,
+    Grid,
+    IconButton,
     InputLabel,
     MenuItem,
     Select,
-    SelectChangeEvent,
     Typography,
-    Paper,
-    Chip,
-    IconButton,
-    Card,
-    CardContent,
-    Grid,
 } from '@mui/material';
-import { FilterList, Close, ExpandLess, ExpandMore } from '@mui/icons-material';
-import { SearchFilters } from '@/types';
+import { FilterList, ExpandMore } from '@mui/icons-material';
+import { useFilters } from '@/context/FilterContext';
 
-interface FiltersProps {
-    year: number | '';
-    setYear: (year: number | '') => void;
-    status: 'purchased' | 'available' | 'all';
-    setStatus: (status: 'purchased' | 'available' | 'all') => void;
+const yearOptions = ['', 2024, 2023, 2022];
+
+function YearSelect() {
+    const { year, setYear } = useFilters();
+    return (
+        <FormControl fullWidth size="small">
+            <InputLabel>Año</InputLabel>
+            <Select
+                value={year}
+                label="Año"
+                onChange={(e) => setYear(e.target.value as number | '')}
+            >
+                {yearOptions.map((option) => (
+                    <MenuItem key={option || 'all'} value={option}>
+                        {option === '' ? 'Todos' : option}
+                    </MenuItem>
+                ))}
+            </Select>
+        </FormControl>
+    );
 }
 
-export default function Filters({ year, setYear, status, setStatus }: FiltersProps) {
-    const [expanded, setExpanded] = useState(true);
+function StatusSelect() {
+    const { status, setStatus } = useFilters();
+    return (
+        <FormControl fullWidth size="small">
+            <InputLabel>Estado</InputLabel>
+            <Select
+                value={status}
+                label="Estado"
+                onChange={(e) => setStatus(e.target.value as 'purchased' | 'available' | 'all')}
+            >
+                <MenuItem value="all">Todos</MenuItem>
+                <MenuItem value="purchased">Comprado</MenuItem>
+                <MenuItem value="available">Disponible</MenuItem>
+            </Select>
+        </FormControl>
+    );
+}
 
-    const handleExpandClick = () => {
-        setExpanded(!expanded);
-    };
+export function FiltersModal() {
+    const { sheetOpen, setSheetOpen, resetFilters } = useFilters();
 
     return (
-        <Card elevation={0} sx={{ mb: 4, border: '1px solid', borderColor: 'divider' }}>
-            <CardContent sx={{ p: 0 }}>
-                <Box
-                    sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        p: 2,
-                        cursor: 'pointer',
-                        bgcolor: 'background.default',
-                    }}
-                    onClick={handleExpandClick}
-                >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <FilterList color="action" />
-                        <Typography variant="subtitle1" fontWeight={600}>
-                            Filtros
-                        </Typography>
-                        {(year || status !== 'all') && (
-                            <Chip
-                                label="Activos"
-                                size="small"
-                                color="primary"
-                                sx={{ height: 24 }}
-                            />
-                        )}
-                    </Box>
-                    <IconButton size="small">
-                        {expanded ? <ExpandLess /> : <ExpandMore />}
-                    </IconButton>
+        <Drawer
+            anchor="bottom"
+            open={sheetOpen}
+            onClose={() => setSheetOpen(false)}
+            PaperProps={{ sx: { borderTopLeftRadius: 16, borderTopRightRadius: 16, p: 2.5 } }}
+        >
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <FilterList color="action" />
+                    <Typography variant="subtitle1" fontWeight={600}>
+                        Filtros
+                    </Typography>
                 </Box>
+                <IconButton size="small" onClick={() => setSheetOpen(false)}>
+                    <ExpandMore />
+                </IconButton>
+            </Box>
 
-                <Collapse in={expanded} timeout="auto" unmountOnExit>
-                    <Box sx={{ p: 3, borderTop: '1px solid', borderColor: 'divider' }}>
-                        <Grid container spacing={3}>
-                            <Grid size={{ xs: 12, md: 4 }}>
-                                <FormControl fullWidth size="small">
-                                    <InputLabel>Año</InputLabel>
-                                    <Select
-                                        value={year}
-                                        label="Año"
-                                        onChange={(e) => setYear(e.target.value as number | '')}
-                                    >
-                                        <MenuItem value="">Todos</MenuItem>
-                                        <MenuItem value={2024}>2024</MenuItem>
-                                        <MenuItem value={2023}>2023</MenuItem>
-                                        <MenuItem value={2022}>2022</MenuItem>
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-                            <Grid size={{ xs: 12, md: 4 }}>
-                                <FormControl fullWidth size="small">
-                                    <InputLabel>Estado</InputLabel>
-                                    <Select
-                                        value={status}
-                                        label="Estado"
-                                        onChange={(e) => setStatus(e.target.value as 'purchased' | 'available' | 'all')}
-                                    >
-                                        <MenuItem value="all">Todos</MenuItem>
-                                        <MenuItem value="purchased">Comprado</MenuItem>
-                                        <MenuItem value="available">Disponible</MenuItem>
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-                            <Grid size={{ xs: 12, md: 4 }} sx={{ display: 'flex', alignItems: 'center' }}>
-                                <Button
-                                    variant="text"
-                                    color="inherit"
-                                    onClick={() => {
-                                        setYear('');
-                                        setStatus('all');
-                                    }}
-                                    disabled={!year && status === 'all'}
-                                >
-                                    Limpiar filtros
-                                </Button>
-                            </Grid>
-                        </Grid>
-                    </Box>
-                </Collapse>
-            </CardContent>
-        </Card>
+            <Grid container spacing={2}>
+                <Grid size={{ xs: 12 }}>
+                    <YearSelect />
+                </Grid>
+                <Grid size={{ xs: 12 }}>
+                    <StatusSelect />
+                </Grid>
+            </Grid>
+
+            <Box sx={{ mt: 3, display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                <Button variant="text" color="inherit" onClick={resetFilters}>
+                    Limpiar
+                </Button>
+                <Button variant="contained" onClick={() => setSheetOpen(false)}>
+                    Aplicar
+                </Button>
+            </Box>
+        </Drawer>
+    );
+}
+
+export function FiltersSummary({ onEdit }: { onEdit: () => void }) {
+    const { year, status, resetFilters } = useFilters();
+    const hasFilters = Boolean(year) || status !== 'all';
+
+    return (
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 1.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                <Typography variant="subtitle2" color="text.secondary">
+                    Filtros
+                </Typography>
+                {hasFilters ? (
+                    <>
+                        {year ? <Chip label={`Año ${year}`} onDelete={() => resetFilters()} /> : null}
+                        {status !== 'all' ? <Chip label={status === 'purchased' ? 'Comprado' : 'Disponible'} onDelete={() => resetFilters()} /> : null}
+                    </>
+                ) : (
+                    <Chip label="Sin filtros" size="small" variant="outlined" />
+                )}
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                {hasFilters && (
+                    <Button variant="text" color="inherit" onClick={resetFilters} sx={{ px: 1 }}>
+                        Limpiar
+                    </Button>
+                )}
+                <Button variant="outlined" size="small" onClick={onEdit}>
+                    Editar filtros
+                </Button>
+            </Box>
+        </Box>
     );
 }

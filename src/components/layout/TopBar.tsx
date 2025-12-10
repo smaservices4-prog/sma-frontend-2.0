@@ -17,12 +17,14 @@ import {
     Menu,
     MenuItem,
     Button,
+    Stack,
 } from '@mui/material';
 import {
     Search as SearchIcon,
     ShoppingCart as ShoppingCartIcon,
     Person as PersonIcon,
     Menu as MenuIcon,
+    FilterList as FilterListIcon,
 } from '@mui/icons-material';
 import Link from 'next/link';
 import { useCart } from '@/context/CartContext';
@@ -30,6 +32,8 @@ import { useCurrency } from '@/context/CurrencyContext';
 import { useSearch } from '@/context/SearchContext';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
+import { useFilters } from '@/context/FilterContext';
+import { FiltersInlineControls } from '@/components/reports/Filters';
 
 export default function TopBar() {
     const theme = useTheme();
@@ -39,6 +43,7 @@ export default function TopBar() {
     const { searchQuery, setSearchQuery } = useSearch();
     const { user, signOut, loading: authLoading } = useAuth();
     const router = useRouter();
+    const { setSheetOpen } = useFilters();
 
     const [anchorElUser, setAnchorElUser] = useState<null | HTMLElement>(null);
 
@@ -101,35 +106,46 @@ export default function TopBar() {
                         {/* Placeholder for mobile menu drawer trigger if needed */}
                     </Box>
 
-                    {/* Search Bar (Desktop) */}
-                    <Box
-                        sx={{
-                            display: { xs: 'none', md: 'flex' },
-                            alignItems: 'center',
-                            backgroundColor: 'grey.100',
-                            borderRadius: 1,
-                            px: 2,
-                            py: 0.5,
-                            mr: 2,
-                            width: '100%',
-                            maxWidth: 400,
-                            border: '1px solid',
-                            borderColor: 'grey.300',
-                            '&:focus-within': {
-                                borderColor: 'primary.main',
-                                backgroundColor: 'white',
-                            },
-                        }}
-                    >
-                        <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />
-                        <InputBase
-                            placeholder="Buscar reportes..."
-                            inputProps={{ 'aria-label': 'search' }}
-                            sx={{ width: '100%' }}
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                    </Box>
+                    {/* Search (Desktop) */}
+                    <Stack direction="row" spacing={1.25} alignItems="center" sx={{ display: { xs: 'none', md: 'flex' }, flexGrow: 1, mr: 2 }}>
+                        <Box
+                            sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                backgroundColor: 'grey.100',
+                                borderRadius: 1,
+                                px: 2,
+                                py: 0,
+                                width: '100%',
+                                maxWidth: 360,
+                                border: '1px solid',
+                                borderColor: 'grey.300',
+                                height: 40,
+                                '&:focus-within': {
+                                    borderColor: 'primary.main',
+                                    backgroundColor: 'white',
+                                },
+                            }}
+                        >
+                            <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />
+                            <InputBase
+                                placeholder="Buscar reportes..."
+                                inputProps={{ 'aria-label': 'search' }}
+                                sx={{ width: '100%' }}
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                            />
+                        </Box>
+                        <Button
+                            variant="outlined"
+                            size="medium"
+                            startIcon={<FilterListIcon />}
+                            onClick={() => setSheetOpen(true)}
+                            sx={{ whiteSpace: 'nowrap' }}
+                        >
+                            Filtros
+                        </Button>
+                    </Stack>
 
                     {/* Actions */}
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -209,28 +225,42 @@ export default function TopBar() {
                     </Box>
                 </Toolbar>
 
-                {/* Mobile Search Bar (Row 2) */}
+                {/* Mobile Search Bar + Filters trigger (Row 2) */}
                 <Box sx={{ display: { xs: 'flex', md: 'none' }, pb: 2 }}>
-                    <Box
-                        sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            backgroundColor: 'grey.100',
-                            borderRadius: 1,
-                            px: 2,
-                            py: 0.5,
-                            width: '100%',
-                            border: '1px solid',
-                            borderColor: 'grey.300',
-                        }}
-                    >
-                        <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />
-                        <InputBase
-                            placeholder="Buscar..."
-                            inputProps={{ 'aria-label': 'search' }}
-                            sx={{ width: '100%' }}
-                        />
-                    </Box>
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ width: '100%' }}>
+                        <Box
+                            sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                backgroundColor: 'grey.100',
+                                borderRadius: 1,
+                                px: 2,
+                                py: 0,
+                                width: '100%',
+                                border: '1px solid',
+                                borderColor: 'grey.300',
+                                height: 40,
+                            }}
+                        >
+                            <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />
+                            <InputBase
+                                placeholder="Buscar..."
+                                inputProps={{ 'aria-label': 'search' }}
+                                sx={{ width: '100%' }}
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                            />
+                        </Box>
+                        <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={<FilterListIcon />}
+                            onClick={() => setSheetOpen(true)}
+                            sx={{ whiteSpace: 'nowrap', height: 40 }}
+                        >
+                            Filtros
+                        </Button>
+                    </Stack>
                 </Box>
             </Container>
         </AppBar>
