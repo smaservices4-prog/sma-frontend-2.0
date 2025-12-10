@@ -34,8 +34,45 @@ export interface UpdateMetadataRequest {
     };
 }
 
+export interface UploadFileResponse {
+    success: boolean;
+    file_path: string;
+    original_name: string;
+    sanitized_name: string;
+    report_id: string;
+}
+
+export interface UploadThumbnailRequest {
+    action: 'uploadThumbnail';
+    report_id: string;
+    file: {
+        name: string;
+        size: number;
+        type: string;
+    };
+    fileData: number[];
+}
+
+export interface UploadThumbnailResponse {
+    success: boolean;
+    report_id: string;
+    thumbnail_uploaded: boolean;
+    thumbnail_path?: string;
+    thumbnail_error?: string;
+    original_name?: string;
+}
+
 export const storageApi = {
-    uploadFileWithMetadata: async (data: UploadFileRequest) => {
+    uploadFileWithMetadata: async (data: UploadFileRequest): Promise<UploadFileResponse> => {
+        const { data: responseData, error } = await supabase.functions.invoke('admin-storage', {
+            body: data
+        });
+
+        if (error) throw error;
+        return responseData;
+    },
+
+    uploadThumbnail: async (data: UploadThumbnailRequest): Promise<UploadThumbnailResponse> => {
         const { data: responseData, error } = await supabase.functions.invoke('admin-storage', {
             body: data
         });

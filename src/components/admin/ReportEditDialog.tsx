@@ -37,10 +37,16 @@ interface ReportMetadata {
     preview_url?: string;
 }
 
+const THUMBNAIL_ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const MAX_THUMBNAIL_SIZE_BYTES = 5 * 1024 * 1024;
+
 export default function ReportEditDialog({ open, onClose, report, onUpdateSuccess }: ReportEditDialogProps) {
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
+    const [warning, setWarning] = useState<string | null>(null);
+    const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+    const [thumbnailError, setThumbnailError] = useState<string | null>(null);
 
     const [reportMetadata, setReportMetadata] = useState<ReportMetadata>({
         title: '',
@@ -67,8 +73,81 @@ export default function ReportEditDialog({ open, onClose, report, onUpdateSucces
                 ],
                 preview_url: report.preview_url || ''
             });
+            setThumbnailFile(null);
+            setThumbnailError(null);
+            setWarning(null);
         }
     }, [report]);
+
+    const validateThumbnailFile = (file: File): string | null => {
+        if (!THUMBNAIL_ACCEPTED_TYPES.includes(file.type)) {
+            return 'Solo se permiten imágenes JPG, PNG o WEBP';
+        }
+        if (file.size > MAX_THUMBNAIL_SIZE_BYTES) {
+            return 'La miniatura no puede superar los 5MB';
+        }
+        return null;
+    };
+
+    const handleThumbnailSelect = (file?: File) => {
+        if (!file) {
+            setThumbnailFile(null);
+            setThumbnailError(null);
+            setWarning(null);
+            return;
+        }
+        const validation = validateThumbnailFile(file);
+        if (validation) {
+            setThumbnailError(validation);
+            setThumbnailFile(null);
+            return;
+        }
+        setThumbnailFile(file);
+        setThumbnailError(null);
+        setWarning(null);
+    };
+
+    const buildThumbnailPayload = async (reportId: string, thumbnail: File) => {
+        const buffer = await thumbnail.arrayBuffer();
+        const uint8Array = new Uint8Array(buffer);
+        const fileData = Array.from(uint8Array);
+
+        return {
+            action: 'uploadThumbnail' as const,
+            report_id: reportId,
+            file: {
+                name: thumbnail.name,
+                size: thumbnail.size,
+                type: thumbnail.type
+            },
+            fileData
+        };
+    };
+
+    const handleRetryThumbnail = async () => {
+        if (!report || !thumbnailFile) {
+            setWarning('No se pudo reintentar la miniatura (falta archivo o ID).');
+            return;
+        }
+
+        setUploading(true);
+        setError(null);
+        setSuccess(null);
+
+        try {
+            const thumbnailPayload = await buildThumbnailPayload(report.id, thumbnailFile);
+            const resp = await storageApi.uploadThumbnail(thumbnailPayload);
+            if (resp.thumbnail_uploaded === false) {
+                setWarning(resp.thumbnail_error || 'La miniatura no se pudo subir. Podés reintentar más tarde.');
+            } else {
+                setWarning(null);
+            }
+        } catch (err: any) {
+            setWarning(err?.message || 'La miniatura no se pudo subir. Podés reintentar más tarde.');
+        } finally {
+            setUploading(false);
+        }
+    };
 
     const handleUpdateReport = async () => {
          if (!report && !reportMetadata.title.trim()) {
@@ -86,10 +165,15 @@ export default function ReportEditDialog({ open, onClose, report, onUpdateSucces
             setError(`Los precios deben ser mayor a 0 para: ${currencies}`);
             return;
         }
+        if (thumbnailError) {
+            setError(thumbnailError);
+            return;
+        }
 
         setUploading(true);
         setError(null);
         setSuccess(null);
+        setWarning(null);
 
         try {
             if (!report) {
@@ -106,6 +190,20 @@ export default function ReportEditDialog({ open, onClose, report, onUpdateSucces
                 prices: reportMetadata.prices,
                 preview_url: reportMetadata.preview_url
             });
+
+            if (thumbnailFile) {
+                let thumbWarning: string | null = null;
+                try {
+                    const thumbnailPayload = await buildThumbnailPayload(report.id, thumbnailFile);
+                    const thumbnailResponse = await storageApi.uploadThumbnail(thumbnailPayload);
+                    if (thumbnailResponse.thumbnail_uploaded === false) {
+                        thumbWarning = thumbnailResponse.thumbnail_error || 'La miniatura no se pudo subir. Podés reintentar más tarde.';
+                    }
+                } catch (thumbErr: any) {
+                    thumbWarning = thumbErr?.message || 'La miniatura no se pudo subir. Podés reintentar más tarde.';
+                }
+                setWarning(thumbWarning);
+            }
 
             setSuccess('Reporte actualizado correctamente');
             
@@ -224,14 +322,67 @@ export default function ReportEditDialog({ open, onClose, report, onUpdateSucces
                                 </Box>
                             </Box>
 
-                            <TextField
-                                fullWidth
-                                label="URL de vista previa (opcional)"
-                                value={reportMetadata.preview_url}
-                                onChange={(e) => setReportMetadata(prev => ({ ...prev, preview_url: e.target.value }))}
-                                disabled={uploading}
-                                placeholder="https://ejemplo.com/preview.jpg"
-                            />
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#2C1810' }}>
+                                    Miniatura (opcional)
+                                </Typography>
+                                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, alignItems: 'flex-start' }}>
+                                    <Button
+                                        variant="outlined"
+                                        component="label"
+                                        disabled={uploading}
+                                        sx={{ color: '#FF8C42', borderColor: '#FF8C42' }}
+                                    >
+                                        Seleccionar imagen
+                                        <input
+                                            hidden
+                                            type="file"
+                                            accept={THUMBNAIL_ACCEPTED_TYPES.join(',')}
+                                            onChange={(e) => handleThumbnailSelect(e.target.files?.[0])}
+                                        />
+                                    </Button>
+                                    {thumbnailFile ? (
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                                {thumbnailFile.name}
+                                            </Typography>
+                                            <Typography variant="caption" sx={{ color: '#8B6F47' }}>
+                                                {(thumbnailFile.size / 1024 / 1024).toFixed(2)} MB
+                                            </Typography>
+                                            <Button
+                                                size="small"
+                                                color="inherit"
+                                                onClick={() => handleThumbnailSelect(undefined)}
+                                                disabled={uploading}
+                                            >
+                                                Quitar
+                                            </Button>
+                                        </Box>
+                                    ) : (
+                                        <Typography variant="body2" sx={{ color: '#8B6F47' }}>
+                                            JPG, PNG o WEBP. Máx 5MB.
+                                        </Typography>
+                                    )}
+                                </Box>
+                            {thumbnailError && <Alert severity="error">{thumbnailError}</Alert>}
+                            {warning && (
+                                <Alert severity="warning" sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
+                                    <Box sx={{ flex: 1 }}>
+                                        {warning}
+                                    </Box>
+                                    {report && thumbnailFile && (
+                                        <Button
+                                            size="small"
+                                            variant="outlined"
+                                            onClick={handleRetryThumbnail}
+                                            disabled={uploading}
+                                        >
+                                            Reintentar miniatura
+                                        </Button>
+                                    )}
+                                </Alert>
+                            )}
+                            </Box>
                         </Box>
 
                 {uploading && <LinearProgress sx={{ mt: 3, borderRadius: '4px' }} />}
@@ -245,7 +396,7 @@ export default function ReportEditDialog({ open, onClose, report, onUpdateSucces
                 <Button
                     onClick={handleUpdateReport}
                     variant="contained"
-                    disabled={uploading || !reportMetadata.title.trim() || !reportMetadata.month || reportMetadata.prices.some(p => p.amount <= 0)}
+                    disabled={uploading || !reportMetadata.title.trim() || !reportMetadata.month || reportMetadata.prices.some(p => p.amount <= 0) || !!thumbnailError}
                     sx={{
                         backgroundColor: '#FF8C42',
                         color: '#FFFFFF',
