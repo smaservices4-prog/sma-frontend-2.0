@@ -6,12 +6,13 @@ import AddIcon from '@mui/icons-material/Add';
 import ReportCard from '@/components/reports/ReportCard';
 import { FiltersModal, FiltersSummary } from '@/components/reports/Filters';
 import { useSearch } from '@/context/SearchContext';
-import { Report } from '@/types';
+import { PaginationInfo, Report } from '@/types';
 import { useAdmin } from '@/hooks/useAdmin';
 import ReportUploadDialog from '@/components/admin/ReportUploadDialog';
 import ReportEditDialog from '@/components/admin/ReportEditDialog';
 import { storageApi } from '@/api/storage';
 import { useFilters } from '@/context/FilterContext';
+import { reportsApi } from '@/api/reports';
 
 function getReportYear(monthIso: string): number | null {
   const year = monthIso.slice(0, 4);
@@ -19,26 +20,37 @@ function getReportYear(monthIso: string): number | null {
   return Number.isNaN(parsed) ? null : parsed;
 }
 
+const PAGE_SIZE = 9;
+
 interface HomeContentProps {
   initialReports: Report[];
+  initialPagination?: PaginationInfo;
 }
 
-export default function HomeContent({ initialReports }: HomeContentProps) {
+export default function HomeContent({ initialReports, initialPagination }: HomeContentProps) {
   const { searchQuery } = useSearch();
   const { isAdmin, loading: adminLoading } = useAdmin();
   const { year, status, setSheetOpen } = useFilters();
   
+  const [reports, setReports] = useState<Report[]>(initialReports);
+  const [pagination, setPagination] = useState<PaginationInfo>(() => ({
+    page: initialPagination?.page ?? 1,
+    limit: initialPagination?.limit ?? PAGE_SIZE,
+    total: initialPagination?.total ?? initialReports.length,
+    total_pages: initialPagination?.total_pages ?? Math.max(1, Math.ceil(initialReports.length / PAGE_SIZE)),
+  }));
+  const [loadingPage, setLoadingPage] = useState(false);
   const [filteredReports, setFilteredReports] = useState<Report[]>(initialReports);
   const availableYears = useMemo(() => {
     const years = new Set<number>();
-    initialReports.forEach((report) => {
+    reports.forEach((report) => {
       const reportYear = getReportYear(report.month);
       if (reportYear) {
         years.add(reportYear);
       }
     });
     return Array.from(years).sort((a, b) => b - a);
-  }, [initialReports]);
+  }, [reports]);
 
   // Admin State
   const [isAdminMode, setIsAdminMode] = useState(false);
@@ -79,7 +91,7 @@ export default function HomeContent({ initialReports }: HomeContentProps) {
   };
 
   useEffect(() => {
-    let result = initialReports;
+    let result = reports;
 
     if (searchQuery) {
       result = result.filter((report) =>
@@ -98,7 +110,26 @@ export default function HomeContent({ initialReports }: HomeContentProps) {
     }
 
     setFilteredReports(result);
-  }, [searchQuery, year, status, initialReports]);
+  }, [searchQuery, year, status, reports]);
+
+  const handlePageChange = async (_event: React.ChangeEvent<unknown>, nextPage: number) => {
+    setLoadingPage(true);
+    try {
+      const response = await reportsApi.getAll({ page: nextPage, perPage: pagination.limit });
+      setReports(response.reports);
+      setPagination({
+        page: response.page,
+        limit: response.per_page ?? pagination.limit,
+        total: response.total_reports,
+        total_pages: response.total_pages,
+      });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (error) {
+      console.error('Failed to fetch reports page', error);
+    } finally {
+      setLoadingPage(false);
+    }
+  };
 
   return (
     <Container maxWidth="lg" sx={{ py: { xs: 3, md: 3.5 } }}>
@@ -176,7 +207,14 @@ export default function HomeContent({ initialReports }: HomeContentProps) {
       {/* Pagination (Mock) */}
       {filteredReports.length > 0 && (
         <Box sx={{ mt: 5, display: 'flex', justifyContent: 'center' }}>
-          <Pagination count={Math.ceil(filteredReports.length / 6) || 1} color="primary" size="large" />
+          <Pagination
+            count={pagination.total_pages || 1}
+            page={pagination.page}
+            color="primary"
+            size="large"
+            onChange={handlePageChange}
+            disabled={loadingPage}
+          />
         </Box>
       )}
 

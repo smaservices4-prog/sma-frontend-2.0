@@ -6,7 +6,23 @@ export const revalidate = 0; // Optional: for dynamic data, or usage of cookies 
 
 export default async function Home() {
   const supabase = await createServerClient();
-  const allReports = await reportsApi.getAll(supabase);
+  const {
+    reports,
+    page,
+    per_page,
+    total_reports,
+    total_pages,
+  } = await reportsApi.getAll({ supabaseClient: supabase, page: 1, perPage: 9 });
 
-  return <HomeContent initialReports={allReports} />;
+  return (
+    <HomeContent
+      initialReports={reports}
+      initialPagination={{
+        page,
+        limit: per_page,
+        total: total_reports,
+        total_pages,
+      }}
+    />
+  );
 }

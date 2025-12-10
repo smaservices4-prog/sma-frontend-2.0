@@ -21,6 +21,9 @@ export interface ReportsResponse {
     user_authenticated: boolean;
     total_reports: number;
     reports: Report[];
+    page: number;
+    per_page: number;
+    total_pages: number;
 }
 
 export interface CartItem {

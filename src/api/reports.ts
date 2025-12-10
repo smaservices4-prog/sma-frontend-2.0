@@ -1,7 +1,13 @@
 import { supabase as defaultSupabase } from '@/lib/supabase';
-import { Report } from '@/types';
+import { Report, ReportsResponse } from '@/types';
 import { mockReports } from './mockData';
 import { SupabaseClient } from '@supabase/supabase-js';
+
+interface GetReportsOptions {
+    page?: number;
+    perPage?: number;
+    supabaseClient?: SupabaseClient;
+}
 
 export interface CreateOrderRequest {
     cart: { report_id: string; quantity: number }[];
@@ -18,11 +24,17 @@ export interface CreateOrderResponse {
 }
 
 export const reportsApi = {
-    getAll: async (supabaseClient?: SupabaseClient): Promise<Report[]> => {
+    getAll: async (options: GetReportsOptions = {}): Promise<ReportsResponse> => {
+        const { page = 1, perPage = 9, supabaseClient } = options;
         const client = supabaseClient || defaultSupabase;
         try {
             // Fetch from Edge Function only
-            const { data, error } = await client.functions.invoke('get-reports');
+            const { data, error } = await client.functions.invoke('get-reports', {
+                body: {
+                    page,
+                    per_page: perPage,
+                },
+            });
 
             if (error) {
                 console.warn('Error fetching reports from Edge Function:', error);
@@ -30,11 +42,33 @@ export const reportsApi = {
             }
 
             const transformed = (data?.reports || []).map(transformReport);
+            const total = data?.total_reports ?? transformed.length;
+            const responsePage = data?.page ?? page;
+            const responsePerPage = data?.per_page ?? perPage;
+            const totalPages = data?.total_pages ?? Math.max(1, Math.ceil(total / responsePerPage));
 
-            return transformed;
+            return {
+                success: data?.success ?? true,
+                user_authenticated: data?.user_authenticated ?? false,
+                reports: transformed,
+                total_reports: total,
+                page: responsePage,
+                per_page: responsePerPage,
+                total_pages: totalPages,
+            };
         } catch (err) {
             console.warn('API/Function failed, falling back to mock data:', err);
-            return mockReports;
+            const total = mockReports.length;
+            const totalPages = Math.max(1, Math.ceil(total / perPage));
+            return {
+                success: true,
+                user_authenticated: false,
+                reports: mockReports.map(transformReport),
+                total_reports: total,
+                page,
+                per_page: perPage,
+                total_pages: totalPages,
+            };
         }
     },
 
