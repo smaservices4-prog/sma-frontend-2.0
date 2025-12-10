@@ -17,10 +17,14 @@ import {
 import { FilterList, ExpandMore } from '@mui/icons-material';
 import { useFilters } from '@/context/FilterContext';
 
-const yearOptions = ['', 2024, 2023, 2022];
+interface FiltersModalProps {
+    yearOptions: number[];
+}
 
-function YearSelect() {
+function YearSelect({ options }: { options: number[] }) {
     const { year, setYear } = useFilters();
+    const optionsWithAll = ['', ...options];
+
     return (
         <FormControl fullWidth size="small">
             <InputLabel>Año</InputLabel>
@@ -29,7 +33,7 @@ function YearSelect() {
                 label="Año"
                 onChange={(e) => setYear(e.target.value as number | '')}
             >
-                {yearOptions.map((option) => (
+                {optionsWithAll.map((option) => (
                     <MenuItem key={option || 'all'} value={option}>
                         {option === '' ? 'Todos' : option}
                     </MenuItem>
@@ -57,7 +61,7 @@ function StatusSelect() {
     );
 }
 
-export function FiltersModal() {
+export function FiltersModal({ yearOptions }: FiltersModalProps) {
     const { sheetOpen, setSheetOpen, resetFilters } = useFilters();
 
     return (
@@ -81,7 +85,7 @@ export function FiltersModal() {
 
             <Grid container spacing={2}>
                 <Grid size={{ xs: 12 }}>
-                    <YearSelect />
+                    <YearSelect options={yearOptions} />
                 </Grid>
                 <Grid size={{ xs: 12 }}>
                     <StatusSelect />

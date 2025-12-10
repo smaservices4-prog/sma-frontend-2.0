@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Container, Typography, Box, Grid, Pagination, FormControlLabel, Switch, Fab, Skeleton } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import ReportCard from '@/components/reports/ReportCard';
@@ -29,6 +29,16 @@ export default function HomeContent({ initialReports }: HomeContentProps) {
   const { year, status, setSheetOpen } = useFilters();
   
   const [filteredReports, setFilteredReports] = useState<Report[]>(initialReports);
+  const availableYears = useMemo(() => {
+    const years = new Set<number>();
+    initialReports.forEach((report) => {
+      const reportYear = getReportYear(report.month);
+      if (reportYear) {
+        years.add(reportYear);
+      }
+    });
+    return Array.from(years).sort((a, b) => b - a);
+  }, [initialReports]);
 
   // Admin State
   const [isAdminMode, setIsAdminMode] = useState(false);
@@ -82,8 +92,9 @@ export default function HomeContent({ initialReports }: HomeContentProps) {
     }
 
     if (status !== 'all') {
-      // Implement status logic if needed
-      // Example: result = result.filter((report) => statusFilter === 'purchased' ? report.purchased : !report.purchased);
+      result = result.filter((report) =>
+        status === 'purchased' ? report.purchased : !report.purchased
+      );
     }
 
     setFilteredReports(result);
@@ -199,7 +210,7 @@ export default function HomeContent({ initialReports }: HomeContentProps) {
       />
 
       {/* Mobile filters sheet */}
-      <FiltersModal />
+      <FiltersModal yearOptions={availableYears} />
     </Container>
   );
 }
