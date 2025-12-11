@@ -31,7 +31,7 @@ export default function HomeContent({ initialReports, initialPagination }: HomeC
   const { searchQuery } = useSearch();
   const { isAdmin, loading: adminLoading } = useAdmin();
   const { year, status, setSheetOpen } = useFilters();
-  
+
   const [reports, setReports] = useState<Report[]>(initialReports);
   const [pagination, setPagination] = useState<PaginationInfo>(() => ({
     page: initialPagination?.page ?? 1,
@@ -131,6 +131,39 @@ export default function HomeContent({ initialReports, initialPagination }: HomeC
     }
   };
 
+  const renderAdminControls = () => {
+    if (adminLoading) {
+      return (
+        <Box sx={{ minHeight: 40 }}>
+          <Skeleton variant="rectangular" width={160} height={40} sx={{ borderRadius: 1 }} />
+        </Box>
+      );
+    }
+
+    if (!isAdmin) {
+      return null;
+    }
+
+    return (
+      <Box sx={{ minHeight: 40 }}>
+        <FormControlLabel
+          control={
+            <Switch
+              checked={isAdminMode}
+              onChange={handleAdminToggle}
+              color="warning"
+            />
+          }
+          label={
+            <Typography variant="subtitle2" fontWeight="bold" color={isAdminMode ? "warning.main" : "text.secondary"}>
+              Modo Administrador
+            </Typography>
+          }
+        />
+      </Box>
+    );
+  };
+
   return (
     <Container maxWidth="lg" sx={{ py: { xs: 3, md: 3.5 } }}>
       {/* Hero + Admin toggle */}
@@ -155,28 +188,7 @@ export default function HomeContent({ initialReports, initialPagination }: HomeC
           </Typography>
         </Box>
 
-        <Box sx={{ minHeight: 40 }}>
-          {adminLoading ? (
-            <Skeleton variant="rectangular" width={160} height={40} sx={{ borderRadius: 1 }} />
-          ) : (
-            isAdmin && (
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={isAdminMode}
-                    onChange={handleAdminToggle}
-                    color="warning"
-                  />
-                }
-                label={
-                  <Typography variant="subtitle2" fontWeight="bold" color={isAdminMode ? "warning.main" : "text.secondary"}>
-                    Modo Administrador
-                  </Typography>
-                }
-              />
-            )
-          )}
-        </Box>
+        {renderAdminControls()}
       </Box>
 
       {/* Reports Grid */}
