@@ -218,13 +218,7 @@ class ExchangeRateService {
     // Formatear precio con conversión
     formatPriceWithConversion(amount: number, currency: string): string {
         const symbol = currency === 'USD' ? '$' : currency === 'ARS' ? '$' : '€';
-        const convertedUSD = this.convertPrice(amount, currency, 'USD');
-
-        if (currency === 'USD') {
-            return `${symbol}${amount.toLocaleString()}`;
-        }
-
-        return `${symbol}${amount.toLocaleString()} (~$${Math.round(convertedUSD).toLocaleString()})`;
+        return `${symbol}${amount.toLocaleString()}`;
     }
 }
 
