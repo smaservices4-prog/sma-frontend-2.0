@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Report, CartItem } from '@/types';
-import { supabase } from '@/lib/supabase';
+import { useAuth } from './AuthContext';
 
 interface CartContextType {
     cartItems: CartItem[];
@@ -17,6 +17,7 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
     const [cartItems, setCartItems] = useState<CartItem[]>([]);
+    const { user } = useAuth();
 
     const saveCart = (items: CartItem[]) => {
         setCartItems(items);
@@ -37,17 +38,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                 console.error('Failed to parse cart from local storage', e);
             }
         }
-
-        // Listen to auth state changes and clear cart on logout
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-            if (event === 'SIGNED_OUT' || !session) {
-                setCartItems([]);
-                localStorage.removeItem('cart');
-            }
-        });
-
-        return () => subscription.unsubscribe();
     }, []);
+
+    // Clear cart when user logs out (listen to user state from AuthContext)
+    useEffect(() => {
+        if (!user) {
+            setCartItems([]);
+            localStorage.removeItem('cart');
+        }
+    }, [user]);
 
     const addToCart = (report: Report) => {
         if (isInCart(report.id)) return;
