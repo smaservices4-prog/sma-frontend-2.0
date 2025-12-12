@@ -57,12 +57,12 @@ export interface CreateOrderRequest {
 
 export interface CreateOrderResponse {
     success: boolean;
-    order_id: string;
-    checkout_url: string;
-    provider_order_id: string;
-    total_amount: number;
-    currency: string;
-    expires_at: string;
+    order_id?: string;
+    checkout_url?: string;
+    provider_order_id?: string;
+    total_amount?: number;
+    currency?: string;
+    expires_at?: string;
     error?: string;
 }
 

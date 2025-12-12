@@ -152,6 +152,52 @@ export const reportsApi = {
             console.error('Error fetching report file:', err);
             return { success: false, error: err.message || 'Failed to get report file' };
         }
+    },
+
+    purchaseFreeReport: async (reportId: string, supabaseClient?: SupabaseClient): Promise<CreateOrderResponse> => {
+        const client = supabaseClient || defaultSupabase;
+        try {
+            // Check authentication first
+            const { data: { session } } = await client.auth.getSession();
+            if (!session) {
+                return {
+                    success: false,
+                    error: 'AUTH_REQUIRED'
+                };
+            }
+
+            // Create order with single free report
+            const orderData: CreateOrderRequest = {
+                cart: [{ report_id: reportId, quantity: 1 }],
+                payment_provider: 'paypal', // Default provider, won't be used for free orders
+                currency: 'USD' // Default currency, won't be used for free orders
+            };
+
+            const { data, error } = await client.functions.invoke('create-order', {
+                body: orderData
+            });
+
+            if (error) {
+                if (error.status === 401 || error.message?.includes('auth') || error.message?.includes('unauthorized')) {
+                    return {
+                        success: false,
+                        error: 'AUTH_REQUIRED'
+                    };
+                }
+                throw error;
+            }
+
+            return data;
+        } catch (err: any) {
+            console.error('Error purchasing free report:', err);
+            if (err.status === 401 || err.message?.includes('auth') || err.message?.includes('unauthorized')) {
+                return {
+                    success: false,
+                    error: 'AUTH_REQUIRED'
+                };
+            }
+            return { success: false, error: err.message || 'Failed to purchase free report' };
+        }
     }
 };
 

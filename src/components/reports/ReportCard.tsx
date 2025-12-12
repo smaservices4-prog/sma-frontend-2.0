@@ -17,6 +17,8 @@ import { Report } from '@/types';
 import { useCurrency } from '@/context/CurrencyContext';
 import { useCart } from '@/context/CartContext';
 import { useRouter } from 'next/navigation';
+import { reportsApi } from '@/api/reports';
+import { useState } from 'react';
 
 function formatMonthLabel(monthIso: string) {
     const [year, month] = monthIso.split('-');
@@ -36,19 +38,38 @@ export default function ReportCard({ report, adminView = false, onEdit, onDelete
     const { selectedCurrency } = useCurrency();
     const { addToCart, removeFromCart, isInCart } = useCart();
     const router = useRouter();
+    const [isPurchasingFree, setIsPurchasingFree] = useState(false);
 
     const priceObj = report.prices.find((p) => p.currency === selectedCurrency) || report.prices[0];
     const price = priceObj?.amount || 0;
     const currencySymbol = selectedCurrency === 'EUR' ? '€' : '$';
+    const isFree = price === 0;
 
     const inCart = isInCart(report.id);
     const purchased = report.purchased;
 
-    const handleAction = () => {
+    const handleAction = async () => {
         if (adminView && onEdit) {
             onEdit(report);
         } else if (purchased) {
             router.push(`/reports/read/${report.id}`);
+        } else if (isFree) {
+            // Handle free report purchase
+            setIsPurchasingFree(true);
+            try {
+                const result = await reportsApi.purchaseFreeReport(report.id);
+                if (result.success) {
+                    // Redirect to reader on successful free purchase
+                    router.push(`/reports/read/${report.id}`);
+                } else {
+                    console.error('Failed to purchase free report:', result.error);
+                    // Could show error toast here
+                }
+            } catch (error) {
+                console.error('Error purchasing free report:', error);
+            } finally {
+                setIsPurchasingFree(false);
+            }
         } else if (inCart) {
             removeFromCart(report.id);
         } else {
@@ -128,7 +149,9 @@ export default function ReportCard({ report, adminView = false, onEdit, onDelete
 
                 <Box sx={{ mt: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <Typography variant="h6" color="primary.main" sx={{ fontWeight: 700 }}>
-                        {!purchased || adminView ? `${currencySymbol}${price}` : 'Leer'}
+                        {purchased && !adminView ? 'Leer' :
+                         isFree ? 'GRATIS' :
+                         `${currencySymbol}${price}`}
                     </Typography>
 
                     <Box sx={{ display: 'flex', gap: 1 }}>
@@ -151,9 +174,11 @@ export default function ReportCard({ report, adminView = false, onEdit, onDelete
                             variant={inCart && !adminView ? "outlined" : "contained"}
                             color={purchased && !adminView ? "success" : (adminView ? "warning" : "primary")}
                             onClick={handleAction}
+                            disabled={isPurchasingFree}
                             startIcon={
                                 adminView ? <Edit /> :
-                                (purchased ? <Visibility /> : <ShoppingCart />)
+                                (purchased ? <Visibility /> :
+                                 !isFree ? <ShoppingCart /> : null)
                             }
                             size="small"
                             sx={{
@@ -161,7 +186,10 @@ export default function ReportCard({ report, adminView = false, onEdit, onDelete
                                 fontWeight: 600,
                             }}
                         >
-                            {adminView ? 'Editar' : (purchased ? 'Leer' : (inCart ? 'Quitar' : 'Agregar'))}
+                            {adminView ? 'Editar' :
+                             (purchased ? 'Leer' :
+                              (isFree ? (isPurchasingFree ? 'Obteniendo...' : 'Obtener Gratis') :
+                               (inCart ? 'Quitar' : 'Agregar')))}
                         </Button>
                     </Box>
                 </Box>
