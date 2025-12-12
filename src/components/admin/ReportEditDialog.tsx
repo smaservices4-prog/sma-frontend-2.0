@@ -21,6 +21,7 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import { Report } from '@/types';
 import { storageApi } from '@/api/storage';
+import { useAuthErrorHandler } from '@/hooks/useAuthErrorHandler';
 
 interface ReportEditDialogProps {
     open: boolean;
@@ -50,6 +51,7 @@ export default function ReportEditDialog({ open, onClose, report, onUpdateSucces
     const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
     const [thumbnailError, setThumbnailError] = useState<string | null>(null);
     const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+    const { checkError } = useAuthErrorHandler();
 
     const [reportMetadata, setReportMetadata] = useState<ReportMetadata>({
         title: '',
@@ -161,6 +163,13 @@ export default function ReportEditDialog({ open, onClose, report, onUpdateSucces
         try {
             const thumbnailPayload = await buildThumbnailPayload(report.id, thumbnailFile);
             const resp = await storageApi.uploadThumbnail(thumbnailPayload);
+
+            // Check for auth errors
+            if (resp && typeof resp === 'object' && 'error' in resp) {
+                checkError(resp.error);
+                return; // Exit early if auth error was handled
+            }
+
             if (resp.thumbnail_uploaded === false) {
                 setWarning(resp.thumbnail_error || 'La miniatura no se pudo subir. Podés reintentar más tarde.');
             } else {
@@ -208,19 +217,30 @@ export default function ReportEditDialog({ open, onClose, report, onUpdateSucces
             // We append -01 to match the storage format
             const formattedMonth = `${reportMetadata.month}-01`;
 
-            await storageApi.updateMetadata(report.id, {
+            const updateResult = await storageApi.updateMetadata(report.id, {
                 title: reportMetadata.title,
                 month: formattedMonth,
                 prices: reportMetadata.prices,
                 preview_url: reportMetadata.preview_url
             });
 
+            // Check for auth errors
+            if (updateResult && typeof updateResult === 'object' && 'error' in updateResult) {
+                checkError(updateResult.error);
+                return; // Exit early if auth error was handled
+            }
+
             if (thumbnailFile) {
                 let thumbWarning: string | null = null;
                 try {
                     const thumbnailPayload = await buildThumbnailPayload(report.id, thumbnailFile);
                     const thumbnailResponse = await storageApi.uploadThumbnail(thumbnailPayload);
-                    if (thumbnailResponse.thumbnail_uploaded === false) {
+
+                    // Check for auth errors in thumbnail upload
+                    if (thumbnailResponse && typeof thumbnailResponse === 'object' && 'error' in thumbnailResponse) {
+                        checkError(thumbnailResponse.error);
+                        thumbWarning = 'Authentication required for thumbnail upload';
+                    } else if (thumbnailResponse.thumbnail_uploaded === false) {
                         thumbWarning = thumbnailResponse.thumbnail_error || 'La miniatura no se pudo subir. Podés reintentar más tarde.';
                     }
                 } catch (thumbErr: any) {

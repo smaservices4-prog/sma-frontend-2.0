@@ -13,6 +13,7 @@ import ReportEditDialog from '@/components/admin/ReportEditDialog';
 import { storageApi } from '@/api/storage';
 import { useFilters } from '@/context/FilterContext';
 import { reportsApi } from '@/api/reports';
+import { useAuthErrorHandler } from '@/hooks/useAuthErrorHandler';
 
 function getReportYear(monthIso: string): number | null {
   const year = monthIso.slice(0, 4);
@@ -31,6 +32,7 @@ export default function HomeContent({ initialReports, initialPagination }: HomeC
   const { searchQuery } = useSearch();
   const { isAdmin, loading: adminLoading } = useAdmin();
   const { year, status, setAvailableYears, setAvailableStatuses } = useFilters();
+  const { checkError } = useAuthErrorHandler();
 
   const [reports, setReports] = useState<Report[]>(initialReports);
   const [pagination, setPagination] = useState<PaginationInfo>(() => ({
@@ -90,7 +92,12 @@ export default function HomeContent({ initialReports, initialPagination }: HomeC
              const report = filteredReports.find(r => r.id === reportId);
              // Cast to any to access file_path which should be present from backend but might be missing in type definition
              if (report && (report as any).file_path) {
-                 await storageApi.deleteFile((report as any).file_path);
+                 const deleteResult = await storageApi.deleteFile((report as any).file_path);
+                 // Check for auth errors
+                 if (deleteResult && typeof deleteResult === 'object' && 'error' in deleteResult) {
+                     checkError(deleteResult.error);
+                     return; // Exit early if auth error was handled
+                 }
                  // Optimistic update or refresh
                  handleRefresh();
              } else {

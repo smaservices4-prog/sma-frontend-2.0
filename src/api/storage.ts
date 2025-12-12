@@ -63,32 +63,68 @@ export interface UploadThumbnailResponse {
 }
 
 export const storageApi = {
-    uploadFileWithMetadata: async (data: UploadFileRequest): Promise<UploadFileResponse> => {
+    uploadFileWithMetadata: async (data: UploadFileRequest): Promise<UploadFileResponse | { error: string }> => {
         const { data: responseData, error } = await supabase.functions.invoke('admin-storage', {
             body: data
         });
 
-        if (error) throw error;
+        if (error) {
+            // Check for authentication errors
+            if (error.status === 401 || error.message?.includes('auth') || error.message?.includes('unauthorized')) {
+                return { error: 'AUTH_REQUIRED' };
+            }
+            throw error;
+        }
+
+        // Check if backend returned an auth error
+        if (responseData && responseData.error === 'AUTH_REQUIRED') {
+            return { error: 'AUTH_REQUIRED' };
+        }
+
         return responseData;
     },
 
-    uploadThumbnail: async (data: UploadThumbnailRequest): Promise<UploadThumbnailResponse> => {
+    uploadThumbnail: async (data: UploadThumbnailRequest): Promise<UploadThumbnailResponse | { error: string }> => {
         const { data: responseData, error } = await supabase.functions.invoke('admin-storage', {
             body: data
         });
 
-        if (error) throw error;
+        if (error) {
+            // Check for authentication errors
+            if (error.status === 401 || error.message?.includes('auth') || error.message?.includes('unauthorized')) {
+                return { error: 'AUTH_REQUIRED' };
+            }
+            throw error;
+        }
+
+        // Check if backend returned an auth error
+        if (responseData && responseData.error === 'AUTH_REQUIRED') {
+            return { error: 'AUTH_REQUIRED' };
+        }
+
         return responseData;
     },
 
-    listFiles: async (): Promise<{ files: AdminFileItem[] }> => {
+    listFiles: async (): Promise<{ files: AdminFileItem[] } | { error: string }> => {
         const { data, error } = await supabase.functions.invoke('admin-storage', {
             body: {
                 action: 'listFiles'
             }
         });
 
-        if (error) throw error;
+        if (error) {
+            // Check for authentication errors
+            if (error.status === 401 || error.message?.includes('auth') || error.message?.includes('unauthorized')) {
+                return { error: 'AUTH_REQUIRED' };
+            }
+            throw error;
+        }
+
+        // Check if backend returned an auth error
+        if (data && data.error === 'AUTH_REQUIRED') {
+            return { error: 'AUTH_REQUIRED' };
+        }
+
         return data;
     },
 
@@ -100,7 +136,19 @@ export const storageApi = {
             },
         });
 
-        if (error) throw error;
+        if (error) {
+            // Check for authentication errors
+            if (error.status === 401 || error.message?.includes('auth') || error.message?.includes('unauthorized')) {
+                return { error: 'AUTH_REQUIRED' };
+            }
+            throw error;
+        }
+
+        // Check if backend returned an auth error
+        if (data && data.error === 'AUTH_REQUIRED') {
+            return { error: 'AUTH_REQUIRED' };
+        }
+
         return data;
     },
 
@@ -112,7 +160,19 @@ export const storageApi = {
             },
         });
 
-        if (error) throw error;
+        if (error) {
+            // Check for authentication errors
+            if (error.status === 401 || error.message?.includes('auth') || error.message?.includes('unauthorized')) {
+                return { error: 'AUTH_REQUIRED' };
+            }
+            throw error;
+        }
+
+        // Check if backend returned an auth error
+        if (data && data.error === 'AUTH_REQUIRED') {
+            return { error: 'AUTH_REQUIRED' };
+        }
+
         return data;
     },
 
@@ -125,23 +185,44 @@ export const storageApi = {
             }
         });
 
-        if (error) throw error;
+        if (error) {
+            // Check for authentication errors
+            if (error.status === 401 || error.message?.includes('auth') || error.message?.includes('unauthorized')) {
+                return { error: 'AUTH_REQUIRED' };
+            }
+            throw error;
+        }
+
+        // Check if backend returned an auth error
+        if (data && data.error === 'AUTH_REQUIRED') {
+            return { error: 'AUTH_REQUIRED' };
+        }
+
         return data;
     },
 
-    verifyAdmin: async (): Promise<boolean> => {
+    verifyAdmin: async (): Promise<boolean | { error: string }> => {
         try {
             const { data, error } = await supabase.functions.invoke('admin-storage', {
                 body: {
                     action: 'verifyAdmin'
                 }
             });
-            
+
             if (error) {
+                // Check for authentication errors
+                if (error.status === 401 || error.message?.includes('auth') || error.message?.includes('unauthorized')) {
+                    return { error: 'AUTH_REQUIRED' };
+                }
                 console.error('Admin verification failed:', error);
                 return false;
             }
-            
+
+            // Check if backend returned an auth error
+            if (data && data.error === 'AUTH_REQUIRED') {
+                return { error: 'AUTH_REQUIRED' };
+            }
+
             return data?.is_admin === true;
         } catch (err) {
             console.error('Admin verification error:', err);

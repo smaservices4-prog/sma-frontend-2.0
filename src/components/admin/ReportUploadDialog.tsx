@@ -21,6 +21,7 @@ import {
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import CloseIcon from '@mui/icons-material/Close';
 import { storageApi, UploadFileRequest } from '@/api/storage';
+import { useAuthErrorHandler } from '@/hooks/useAuthErrorHandler';
 
 interface ReportUploadDialogProps {
     open: boolean;
@@ -142,6 +143,7 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
     const [selectedEntries, setSelectedEntries] = useState<FileEntry[]>([]);
     const [defaultPrices, setDefaultPrices] = useState<PriceInput[]>(DEFAULT_PRICES);
     const [isDragging, setIsDragging] = useState(false);
+    const { checkError } = useAuthErrorHandler();
 
     useEffect(() => {
         if (!open) {
@@ -354,6 +356,13 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
         try {
             const thumbnailPayload = await buildThumbnailPayload(entry.reportId, entry.thumbnailFile);
             const resp = await storageApi.uploadThumbnail(thumbnailPayload);
+
+            // Check for auth errors
+            if (resp && typeof resp === 'object' && 'error' in resp) {
+                checkError(resp.error);
+                return; // Exit early if auth error was handled
+            }
+
             setSelectedEntries(prev => {
                 const updated = prev.map(item => {
                     if (item.id !== entryId) return item;
@@ -415,6 +424,20 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
                 const payload = await buildUploadPayload(entry);
                 const uploadResponse = await storageApi.uploadFileWithMetadata(payload);
 
+                // Check for auth errors
+                if (uploadResponse && typeof uploadResponse === 'object' && 'error' in uploadResponse) {
+                    checkError(uploadResponse.error);
+                    failureCount += 1;
+                    setSelectedEntries(prev =>
+                        prev.map(item =>
+                            item.id === entry.id
+                                ? { ...item, status: 'error' as UploadStatus, error: 'Authentication required' }
+                                : item
+                        )
+                    );
+                    continue; // Skip to next entry
+                }
+
                 let thumbnailWarning: string | undefined;
                 let thumbnailUploaded: boolean | undefined;
 
@@ -423,7 +446,12 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
                         const thumbnailPayload = await buildThumbnailPayload(uploadResponse.report_id, entry.thumbnailFile);
                         const thumbnailResponse = await storageApi.uploadThumbnail(thumbnailPayload);
 
-                        if (thumbnailResponse.thumbnail_uploaded === false) {
+                        // Check for auth errors in thumbnail upload
+                        if (thumbnailResponse && typeof thumbnailResponse === 'object' && 'error' in thumbnailResponse) {
+                            checkError(thumbnailResponse.error);
+                            thumbnailWarning = 'Authentication required for thumbnail upload';
+                            thumbnailUploaded = false;
+                        } else if (thumbnailResponse.thumbnail_uploaded === false) {
                             thumbnailWarning = thumbnailResponse.thumbnail_error || 'La miniatura no se pudo subir. Podés reintentar más tarde.';
                             thumbnailUploaded = false;
                         } else {

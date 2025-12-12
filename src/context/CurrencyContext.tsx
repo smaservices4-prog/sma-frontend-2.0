@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useExchangeRates } from './ExchangeRateContext';
 import { useAuth } from './AuthContext';
 import { userPreferencesApi } from '@/api/userPreferences';
+import { useAuthErrorHandler } from '@/hooks/useAuthErrorHandler';
 
 type Currency = 'USD' | 'ARS' | 'EUR';
 
@@ -21,6 +22,7 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     const [loading, setLoading] = useState(true);
     const { formatPriceWithConversion } = useExchangeRates();
     const { user } = useAuth();
+    const { checkError } = useAuthErrorHandler();
 
     useEffect(() => {
         const initializeCurrency = async () => {
@@ -34,6 +36,11 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
             if (user) {
                 try {
                     const preferences = await userPreferencesApi.getPreferences();
+                    // Check for auth errors
+                    if (preferences && typeof preferences === 'object' && 'error' in preferences) {
+                        checkError(preferences.error);
+                        return; // Exit early if auth error was handled
+                    }
                     if (preferences?.preferred_currency && ['USD', 'ARS', 'EUR'].includes(preferences.preferred_currency)) {
                         setSelectedCurrencyState(preferences.preferred_currency);
                         // Sync local storage
@@ -55,7 +62,11 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
 
         if (user) {
             try {
-                await userPreferencesApi.updatePreferences({ preferred_currency: currency });
+                const result = await userPreferencesApi.updatePreferences({ preferred_currency: currency });
+                // Check for auth errors
+                if (result && typeof result === 'object' && 'error' in result) {
+                    checkError(result.error);
+                }
             } catch (error) {
                 console.error('Failed to update user preferences:', error);
             }
