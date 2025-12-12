@@ -147,13 +147,13 @@ function PaypalCheckout({ width = '100%', onLoad }: PaypalCheckoutProps) {
         } catch (error) {
             console.error("Error en onApprove", error);
             setMessage(`Lo sentimos, tu transacción no pudo ser procesada... ${error instanceof Error ? error.message : String(error)}`);
-            router.push('/payment/error');
+            router.push('/payment/failure');
         }
     };
 
     const onError = (err: any) => {
         console.error("PayPal Checkout onError", err);
-        router.push('/payment/error');
+        router.push('/payment/failure');
     };
 
     const onCancel = () => {

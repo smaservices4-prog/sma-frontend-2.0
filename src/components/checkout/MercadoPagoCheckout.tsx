@@ -83,7 +83,9 @@ const MercadoPagoCheckout = ({
                 const returnUrl = encodeURIComponent(pathname || '/cart');
                 router.push(`/login?returnTo=${returnUrl}`);
             } else {
-                setMessage("Error al procesar el pago. Por favor, intente nuevamente.");
+                // Redirect to failure page with error details
+                const errorMessage = error instanceof Error ? error.message : "Error al procesar el pago";
+                router.push(`/payment/failure?error=${encodeURIComponent(errorMessage)}`);
             }
         } finally {
             setIsLoading(false);
