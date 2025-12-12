@@ -12,28 +12,25 @@ import {
     InputLabel,
     MenuItem,
     Select,
+    Stack,
     Typography,
 } from '@mui/material';
 import { FilterList, ExpandMore } from '@mui/icons-material';
 import { useFilters } from '@/context/FilterContext';
 
-interface FiltersModalProps {
-    yearOptions: number[];
-}
-
-function YearSelect({ options }: { options: number[] }) {
-    const { year, setYear } = useFilters();
-    const optionsWithAll = ['', ...options];
+function YearSelect({ fullWidth = false }: { fullWidth?: boolean }) {
+    const { year, setYear, availableYears } = useFilters();
+    const options = React.useMemo(() => ['' as const, ...availableYears], [availableYears]);
 
     return (
-        <FormControl fullWidth size="small">
+        <FormControl size="small" fullWidth={fullWidth} sx={fullWidth ? { width: '100%' } : { minWidth: 110, width: 'auto' }}>
             <InputLabel>Año</InputLabel>
             <Select
                 value={year}
                 label="Año"
                 onChange={(e) => setYear(e.target.value as number | '')}
             >
-                {optionsWithAll.map((option) => (
+                {options.map((option) => (
                     <MenuItem key={option || 'all'} value={option}>
                         {option === '' ? 'Todos' : option}
                     </MenuItem>
@@ -43,25 +40,28 @@ function YearSelect({ options }: { options: number[] }) {
     );
 }
 
-function StatusSelect() {
-    const { status, setStatus } = useFilters();
+function StatusSelect({ fullWidth = false }: { fullWidth?: boolean }) {
+    const { status, setStatus, availableStatuses } = useFilters();
+    const options = React.useMemo(() => ['all' as const, ...availableStatuses], [availableStatuses]);
     return (
-        <FormControl fullWidth size="small">
+        <FormControl size="small" fullWidth={fullWidth} sx={fullWidth ? { width: '100%' } : { minWidth: 120, width: 'auto' }}>
             <InputLabel>Estado</InputLabel>
             <Select
                 value={status}
                 label="Estado"
                 onChange={(e) => setStatus(e.target.value as 'purchased' | 'available' | 'all')}
             >
-                <MenuItem value="all">Todos</MenuItem>
-                <MenuItem value="purchased">Comprado</MenuItem>
-                <MenuItem value="available">Disponible</MenuItem>
+                {options.map((option) => (
+                    <MenuItem key={option} value={option}>
+                        {option === 'all' ? 'Todos' : option === 'purchased' ? 'Comprado' : 'Disponible'}
+                    </MenuItem>
+                ))}
             </Select>
         </FormControl>
     );
 }
 
-export function FiltersModal({ yearOptions }: FiltersModalProps) {
+export function FiltersModal() {
     const { sheetOpen, setSheetOpen, resetFilters } = useFilters();
 
     return (
@@ -85,10 +85,10 @@ export function FiltersModal({ yearOptions }: FiltersModalProps) {
 
             <Grid container spacing={2}>
                 <Grid size={{ xs: 12 }}>
-                    <YearSelect options={yearOptions} />
+                    <YearSelect fullWidth />
                 </Grid>
                 <Grid size={{ xs: 12 }}>
-                    <StatusSelect />
+                    <StatusSelect fullWidth />
                 </Grid>
             </Grid>
 
@@ -134,5 +134,35 @@ export function FiltersSummary({ onEdit }: { onEdit: () => void }) {
                 </Button>
             </Box>
         </Box>
+    );
+}
+
+export function FiltersInlineControls() {
+    const { year, status, resetFilters } = useFilters();
+    const appliedCount = (year ? 1 : 0) + (status !== 'all' ? 1 : 0);
+
+    return (
+        <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+            sx={{
+                flexWrap: 'wrap',
+                rowGap: 0.5,
+                columnGap: 1,
+            }}
+        >
+            <Box sx={{ flex: '0 0 auto' }}>
+                <YearSelect />
+            </Box>
+            <Box sx={{ flex: '0 0 auto' }}>
+                <StatusSelect />
+            </Box>
+            {appliedCount > 0 && (
+                <Button variant="text" size="small" color="inherit" onClick={resetFilters} sx={{ minWidth: 64 }}>
+                    Limpiar
+                </Button>
+            )}
+        </Stack>
     );
 }

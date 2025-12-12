@@ -9,6 +9,10 @@ interface FilterContextType {
     status: StatusFilter;
     setYear: (year: number | '') => void;
     setStatus: (status: StatusFilter) => void;
+    availableYears: number[];
+    setAvailableYears: (years: number[]) => void;
+    availableStatuses: StatusFilter[];
+    setAvailableStatuses: (statuses: StatusFilter[]) => void;
     resetFilters: () => void;
     sheetOpen: boolean;
     setSheetOpen: (open: boolean) => void;
@@ -20,6 +24,8 @@ export function FilterProvider({ children }: { children: React.ReactNode }) {
     const [year, setYear] = useState<number | ''>('');
     const [status, setStatus] = useState<StatusFilter>('all');
     const [sheetOpen, setSheetOpen] = useState(false);
+    const [availableYears, setAvailableYears] = useState<number[]>([]);
+    const [availableStatuses, setAvailableStatuses] = useState<StatusFilter[]>(['available', 'purchased']);
 
     const value = useMemo(
         () => ({
@@ -27,6 +33,10 @@ export function FilterProvider({ children }: { children: React.ReactNode }) {
             status,
             setYear,
             setStatus,
+            availableYears,
+            setAvailableYears,
+            availableStatuses,
+            setAvailableStatuses,
             resetFilters: () => {
                 setYear('');
                 setStatus('all');
@@ -34,7 +44,7 @@ export function FilterProvider({ children }: { children: React.ReactNode }) {
             sheetOpen,
             setSheetOpen,
         }),
-        [year, status, sheetOpen],
+        [year, status, sheetOpen, availableYears, availableStatuses],
     );
 
     return <FilterContext.Provider value={value}>{children}</FilterContext.Provider>;

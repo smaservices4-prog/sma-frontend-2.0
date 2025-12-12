@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Container, Typography, Box, Grid, Pagination, FormControlLabel, Switch, Fab, Skeleton } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import ReportCard from '@/components/reports/ReportCard';
@@ -30,7 +30,7 @@ interface HomeContentProps {
 export default function HomeContent({ initialReports, initialPagination }: HomeContentProps) {
   const { searchQuery } = useSearch();
   const { isAdmin, loading: adminLoading } = useAdmin();
-  const { year, status, setSheetOpen } = useFilters();
+  const { year, status, setAvailableYears, setAvailableStatuses } = useFilters();
 
   const [reports, setReports] = useState<Report[]>(initialReports);
   const [pagination, setPagination] = useState<PaginationInfo>(() => ({
@@ -41,16 +41,28 @@ export default function HomeContent({ initialReports, initialPagination }: HomeC
   }));
   const [loadingPage, setLoadingPage] = useState(false);
   const [filteredReports, setFilteredReports] = useState<Report[]>(initialReports);
-  const availableYears = useMemo(() => {
-    const years = new Set<number>();
-    reports.forEach((report) => {
-      const reportYear = getReportYear(report.month);
-      if (reportYear) {
-        years.add(reportYear);
-      }
-    });
-    return Array.from(years).sort((a, b) => b - a);
-  }, [reports]);
+
+  useEffect(() => {
+    const uniqueYears = Array.from(
+      new Set(
+        reports
+          .map((report) => getReportYear(report.month))
+          .filter((value): value is number => value !== null)
+      )
+    ).sort((a, b) => b - a);
+
+    setAvailableYears(uniqueYears);
+  }, [reports, setAvailableYears]);
+
+  useEffect(() => {
+    const hasPurchased = reports.some((report) => report.purchased);
+    const hasAvailable = reports.some((report) => !report.purchased);
+    const statuses = [
+      ...(hasAvailable ? ['available' as const] : []),
+      ...(hasPurchased ? ['purchased' as const] : []),
+    ];
+    setAvailableStatuses(statuses);
+  }, [reports, setAvailableStatuses]);
 
   // Admin State
   const [isAdminMode, setIsAdminMode] = useState(false);
@@ -260,7 +272,7 @@ export default function HomeContent({ initialReports, initialPagination }: HomeC
       />
 
       {/* Mobile filters sheet */}
-      <FiltersModal yearOptions={availableYears} />
+      <FiltersModal />
     </Container>
   );
 }

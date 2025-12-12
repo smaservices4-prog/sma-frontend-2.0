@@ -106,8 +106,19 @@ export default function TopBar() {
                         {/* Placeholder for mobile menu drawer trigger if needed */}
                     </Box>
 
-                    {/* Search (Desktop) */}
-                    <Stack direction="row" spacing={1.25} alignItems="center" sx={{ display: { xs: 'none', md: 'flex' }, flexGrow: 1, mr: 2 }}>
+                    {/* Search (Desktop/Large) */}
+                    <Stack
+                        direction="row"
+                        spacing={1}
+                        alignItems="center"
+                        sx={{
+                            display: { xs: 'none', lg: 'flex' },
+                            flexGrow: 1,
+                            mr: 2,
+                            flexWrap: 'wrap',
+                            rowGap: 0.75,
+                        }}
+                    >
                         <Box
                             sx={{
                                 display: 'flex',
@@ -116,8 +127,9 @@ export default function TopBar() {
                                 borderRadius: 1,
                                 px: 2,
                                 py: 0,
-                                width: '100%',
-                                maxWidth: 360,
+                                flex: '2 1 320px',
+                                minWidth: 260,
+                                maxWidth: '100%',
                                 border: '1px solid',
                                 borderColor: 'grey.300',
                                 height: 40,
@@ -136,15 +148,16 @@ export default function TopBar() {
                                 onChange={(e) => setSearchQuery(e.target.value)}
                             />
                         </Box>
-                        <Button
-                            variant="outlined"
-                            size="medium"
-                            startIcon={<FilterListIcon />}
-                            onClick={() => setSheetOpen(true)}
-                            sx={{ whiteSpace: 'nowrap' }}
+                        <Box
+                            sx={{
+                                flex: '0 1 auto',
+                                minWidth: 0,
+                                display: 'flex',
+                                justifyContent: 'flex-end',
+                            }}
                         >
-                            Filtros
-                        </Button>
+                            <FiltersInlineControls />
+                        </Box>
                     </Stack>
 
                     {/* Actions */}
@@ -226,7 +239,7 @@ export default function TopBar() {
                 </Toolbar>
 
                 {/* Mobile Search Bar + Filters trigger (Row 2) */}
-                <Box sx={{ display: { xs: 'flex', md: 'none' }, pb: 2 }}>
+                <Box sx={{ display: { xs: 'flex', lg: 'none' }, pb: 2 }}>
                     <Stack direction="row" spacing={1} alignItems="center" sx={{ width: '100%' }}>
                         <Box
                             sx={{
