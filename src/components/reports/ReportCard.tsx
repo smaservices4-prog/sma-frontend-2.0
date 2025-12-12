@@ -11,6 +11,11 @@ import {
     Chip,
     useTheme,
     IconButton,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogContentText,
+    DialogActions,
 } from '@mui/material';
 import { ShoppingCart, Download, Check, Visibility, Edit, Delete } from '@mui/icons-material';
 import { Report } from '@/types';
@@ -39,6 +44,7 @@ export default function ReportCard({ report, adminView = false, onEdit, onDelete
     const { addToCart, removeFromCart, isInCart } = useCart();
     const router = useRouter();
     const [isPurchasingFree, setIsPurchasingFree] = useState(false);
+    const [showAuthDialog, setShowAuthDialog] = useState(false);
 
     const priceObj = report.prices.find((p) => p.currency === selectedCurrency) || report.prices[0];
     const price = priceObj?.amount || 0;
@@ -61,6 +67,9 @@ export default function ReportCard({ report, adminView = false, onEdit, onDelete
                 if (result.success) {
                     // Redirect to reader on successful free purchase
                     router.push(`/reports/read/${report.id}`);
+                } else if (result.error === 'AUTH_REQUIRED') {
+                    // Show login dialog for unauthenticated users
+                    setShowAuthDialog(true);
                 } else {
                     console.error('Failed to purchase free report:', result.error);
                     // Could show error toast here
@@ -83,6 +92,7 @@ export default function ReportCard({ report, adminView = false, onEdit, onDelete
     };
 
     return (
+        <>
         <Card
             sx={{
                 height: '100%',
@@ -195,5 +205,37 @@ export default function ReportCard({ report, adminView = false, onEdit, onDelete
                 </Box>
             </CardContent>
         </Card>
+
+        {/* Authentication Required Dialog */}
+        <Dialog
+            open={showAuthDialog}
+            onClose={() => setShowAuthDialog(false)}
+            aria-labelledby="auth-dialog-title"
+        >
+            <DialogTitle id="auth-dialog-title">
+                Inicio de Sesión Requerido
+            </DialogTitle>
+            <DialogContent>
+                <DialogContentText>
+                    Para acceder a este reporte gratis, debes iniciar sesión.
+                </DialogContentText>
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={() => setShowAuthDialog(false)} color="inherit">
+                    Cancelar
+                </Button>
+                <Button
+                    onClick={() => {
+                        setShowAuthDialog(false);
+                        router.push('/login');
+                    }}
+                    variant="contained"
+                    color="primary"
+                >
+                    Iniciar Sesión
+                </Button>
+            </DialogActions>
+        </Dialog>
+        </>
     );
 }
