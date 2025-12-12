@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useCallback } from 'react';
 import AuthModal from '@/components/auth/AuthModal';
 
 interface AuthModalContextType {
@@ -10,24 +10,27 @@ interface AuthModalContextType {
 
 const AuthModalContext = createContext<AuthModalContextType | undefined>(undefined);
 
+// Memoized AuthModal to prevent unnecessary re-renders
+const MemoizedAuthModal = React.memo(AuthModal);
+
 export function AuthModalProvider({ children }: { children: React.ReactNode }) {
     const [isOpen, setIsOpen] = useState(false);
     const [message, setMessage] = useState<string>('');
 
-    const showAuthModal = (customMessage?: string) => {
+    const showAuthModal = useCallback((customMessage?: string) => {
         setMessage(customMessage || 'Para continuar con esta acción, necesitas iniciar sesión en tu cuenta.');
         setIsOpen(true);
-    };
+    }, []);
 
-    const hideAuthModal = () => {
+    const hideAuthModal = useCallback(() => {
         setIsOpen(false);
         setMessage('');
-    };
+    }, []);
 
     return (
         <AuthModalContext.Provider value={{ showAuthModal, hideAuthModal }}>
             {children}
-            <AuthModal
+            <MemoizedAuthModal
                 open={isOpen}
                 onClose={hideAuthModal}
                 message={message}

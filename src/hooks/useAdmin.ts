@@ -7,6 +7,7 @@ export function useAdmin() {
     const { user } = useAuth();
     const [isAdmin, setIsAdmin] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [authErrorHandled, setAuthErrorHandled] = useState(false);
     const { checkError } = useAuthErrorHandler();
 
     useEffect(() => {
@@ -21,12 +22,24 @@ export function useAdmin() {
                 return;
             }
 
+            if (authErrorHandled) {
+                // Skip API call if auth error was already handled
+                if (mounted) {
+                    setIsAdmin(false);
+                    setLoading(false);
+                }
+                return;
+            }
+
             try {
                 // Call backend to verify admin status
                 const result = await storageApi.verifyAdmin();
                 // Check for auth errors
                 if (result && typeof result === 'object' && 'error' in result) {
-                    checkError(result.error);
+                    const errorHandled = checkError(result.error);
+                    if (errorHandled) {
+                        setAuthErrorHandled(true);
+                    }
                     if (mounted) {
                         setIsAdmin(false);
                     }
@@ -52,6 +65,11 @@ export function useAdmin() {
         return () => {
             mounted = false;
         };
+    }, [user, authErrorHandled]);
+
+    // Reset auth error flag when user changes
+    useEffect(() => {
+        setAuthErrorHandled(false);
     }, [user]);
 
     return { isAdmin, loading };

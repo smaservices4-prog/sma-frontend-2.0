@@ -20,6 +20,7 @@ const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined
 export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     const [selectedCurrency, setSelectedCurrencyState] = useState<Currency>('USD');
     const [loading, setLoading] = useState(true);
+    const [authErrorHandled, setAuthErrorHandled] = useState(false);
     const { formatPriceWithConversion } = useExchangeRates();
     const { user } = useAuth();
     const { checkError } = useAuthErrorHandler();
@@ -32,13 +33,16 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
                 setSelectedCurrencyState(savedCurrency);
             }
 
-            // If user is logged in, fetch from API
-            if (user) {
+            // If user is logged in and we haven't already handled an auth error, fetch from API
+            if (user && !authErrorHandled) {
                 try {
                     const preferences = await userPreferencesApi.getPreferences();
                     // Check for auth errors
                     if (preferences && typeof preferences === 'object' && 'error' in preferences) {
-                        checkError(preferences.error);
+                        const errorHandled = checkError(preferences.error);
+                        if (errorHandled) {
+                            setAuthErrorHandled(true); // Prevent further API calls
+                        }
                         return; // Exit early if auth error was handled
                     }
                     if (preferences?.preferred_currency && ['USD', 'ARS', 'EUR'].includes(preferences.preferred_currency)) {
@@ -54,18 +58,26 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
         };
 
         initializeCurrency();
+    }, [user, authErrorHandled]);
+
+    // Reset auth error flag when user changes
+    useEffect(() => {
+        setAuthErrorHandled(false);
     }, [user]);
 
     const setSelectedCurrency = async (currency: Currency) => {
         setSelectedCurrencyState(currency);
         localStorage.setItem('preferred_currency', currency);
 
-        if (user) {
+        if (user && !authErrorHandled) {
             try {
                 const result = await userPreferencesApi.updatePreferences({ preferred_currency: currency });
                 // Check for auth errors
                 if (result && typeof result === 'object' && 'error' in result) {
-                    checkError(result.error);
+                    const errorHandled = checkError(result.error);
+                    if (errorHandled) {
+                        setAuthErrorHandled(true);
+                    }
                 }
             } catch (error) {
                 console.error('Failed to update user preferences:', error);
