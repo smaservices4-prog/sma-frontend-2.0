@@ -13,19 +13,19 @@ export const userPreferencesApi = {
                 body: { action: 'getPreferences' },
             });
 
-            if (error) {
-                console.log('userPreferencesApi error:', error);
-                console.log('error.status:', error.status);
-                console.log('error.message:', error.message);
-                console.log('error.details:', error.details);
-                // Check for authentication errors
-                if (error.status === 401 || error.message?.includes('auth') || error.message?.includes('unauthorized')) {
-                    console.log('Auth error detected in userPreferencesApi:', error);
-                    return { error: 'AUTH_REQUIRED' };
-                }
-                console.error('Error fetching user preferences:', error);
-                return { error: error.message || 'Failed to fetch preferences' };
+        if (error) {
+            // Check for authentication errors
+            // Supabase FunctionsHttpError doesn't expose status directly, so check message
+            if (error.message?.includes('non-2xx status code') ||
+                error.status === 401 ||
+                error.message?.includes('auth') ||
+                error.message?.includes('unauthorized') ||
+                (error as any).context?.status === 401) {
+                return { error: 'AUTH_REQUIRED' };
             }
+            console.error('Error fetching user preferences:', error);
+            return { error: error.message || 'Failed to fetch preferences' };
+        }
 
             // Backend returns: { success: boolean, preferences: UserPreferences, error?: string }
             if (data && data.success) {
@@ -39,12 +39,12 @@ export const userPreferencesApi = {
 
             return { error: data?.error || 'Failed to fetch preferences' };
         } catch (err: any) {
-            console.log('userPreferencesApi caught exception:', err);
-            console.log('exception status:', err.status);
-            console.log('exception message:', err.message);
             // Check if the caught exception is an auth error
-            if (err.status === 401 || err.message?.includes('auth') || err.message?.includes('unauthorized')) {
-                console.log('Auth error detected in caught exception:', err);
+            if (err.message?.includes('non-2xx status code') ||
+                err.status === 401 ||
+                err.message?.includes('auth') ||
+                err.message?.includes('unauthorized') ||
+                err.context?.status === 401) {
                 return { error: 'AUTH_REQUIRED' };
             }
             console.error('Exception in userPreferencesApi:', err);
@@ -65,7 +65,12 @@ export const userPreferencesApi = {
 
             if (error) {
                 // Check for authentication errors
-                if (error.status === 401 || error.message?.includes('auth') || error.message?.includes('unauthorized')) {
+                // Supabase FunctionsHttpError doesn't expose status directly, so check message
+                if (error.message?.includes('non-2xx status code') ||
+                    error.status === 401 ||
+                    error.message?.includes('auth') ||
+                    error.message?.includes('unauthorized') ||
+                    (error as any).context?.status === 401) {
                     return { error: 'AUTH_REQUIRED' };
                 }
                 console.error('Error updating user preferences:', error);
@@ -85,7 +90,11 @@ export const userPreferencesApi = {
             return { error: data?.error || 'Failed to update preferences' };
         } catch (err: any) {
             // Check if the caught exception is an auth error
-            if (err.status === 401 || err.message?.includes('auth') || err.message?.includes('unauthorized')) {
+            if (err.message?.includes('non-2xx status code') ||
+                err.status === 401 ||
+                err.message?.includes('auth') ||
+                err.message?.includes('unauthorized') ||
+                err.context?.status === 401) {
                 return { error: 'AUTH_REQUIRED' };
             }
             console.error('Exception in updatePreferences:', err);
