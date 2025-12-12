@@ -58,9 +58,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         getSession();
 
-        // Auth state listener with protection against loops
+        // Auth state listener - the issue might be that this listener itself triggers token refreshes
+        // Let's try a different approach: only listen to SIGNED_IN and SIGNED_OUT events
         let lastSessionId: string | null = null;
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            // Only process SIGNED_IN and SIGNED_OUT events to avoid TOKEN_REFRESHED loops
+            if (event !== 'SIGNED_IN' && event !== 'SIGNED_OUT') {
+                return;
+            }
+
             // Prevent duplicate updates for the same session
             const currentSessionId = session?.user?.id || null;
             if (lastSessionId === currentSessionId) {
