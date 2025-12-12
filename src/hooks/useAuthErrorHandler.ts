@@ -19,8 +19,10 @@ export function useAuthErrorHandler() {
     }, [showAuthModal]);
 
     const checkError = useCallback((error: any): boolean => {
+        console.log('useAuthErrorHandler.checkError called with:', error);
         // Check if error is AUTH_REQUIRED
         if (typeof error === 'string' && error === 'AUTH_REQUIRED') {
+            console.log('useAuthErrorHandler: showing auth modal for string AUTH_REQUIRED');
             showAuthModal();
             return true; // Error was handled
         }
@@ -28,11 +30,13 @@ export function useAuthErrorHandler() {
         // Check if error object contains AUTH_REQUIRED
         if (error && typeof error === 'object') {
             if (error.error === 'AUTH_REQUIRED' || error.message === 'AUTH_REQUIRED') {
+                console.log('useAuthErrorHandler: showing auth modal for object AUTH_REQUIRED');
                 showAuthModal();
                 return true;
             }
         }
 
+        console.log('useAuthErrorHandler: error not handled');
         return false; // Error was not handled
     }, [showAuthModal]);
 

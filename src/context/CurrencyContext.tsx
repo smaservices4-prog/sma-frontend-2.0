@@ -36,8 +36,10 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
             if (user) {
                 try {
                     const preferences = await userPreferencesApi.getPreferences();
+                    console.log('CurrencyContext: preferences result:', preferences);
                     // Check for auth errors
                     if (preferences && typeof preferences === 'object' && 'error' in preferences) {
+                        console.log('CurrencyContext: auth error detected:', preferences.error);
                         checkError(preferences.error);
                         return; // Exit early if auth error was handled
                     }

@@ -15,6 +15,7 @@ export function AuthModalProvider({ children }: { children: React.ReactNode }) {
     const [message, setMessage] = useState<string>('');
 
     const showAuthModal = (customMessage?: string) => {
+        console.log('AuthModalContext.showAuthModal called with message:', customMessage);
         setMessage(customMessage || 'Para continuar con esta acción, necesitas iniciar sesión en tu cuenta.');
         setIsOpen(true);
     };
