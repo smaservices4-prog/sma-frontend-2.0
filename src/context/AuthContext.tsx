@@ -19,13 +19,21 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-    console.log('AuthProvider: initializing');
+    // Prevent auth operations during static generation
+    const isStaticGeneration = typeof window === 'undefined';
+
     const [user, setUser] = useState<User | null>(null);
     const [session, setSession] = useState<Session | null>(null);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
 
     useEffect(() => {
+        // Skip auth operations during static generation
+        if (isStaticGeneration) {
+            setLoading(false);
+            return;
+        }
+
         let mounted = true;
 
         // Check active session once on mount
@@ -36,7 +44,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     console.error('AuthContext: getSession error:', error);
                 }
                 if (mounted) {
-                    console.log('AuthContext: initial getSession result', session?.user?.id);
                     setSession(session);
                     setUser(session?.user ?? null);
                     setLoading(false);
@@ -51,23 +58,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         getSession();
 
-        // Disable auth state listener for now to test if it's causing the token refresh loop
-        /*
+        // Auth state listener with protection against loops
+        let lastSessionId: string | null = null;
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            console.log('AuthContext: onAuthStateChange triggered', _event, session?.user?.id);
+            // Prevent duplicate updates for the same session
+            const currentSessionId = session?.user?.id || null;
+            if (lastSessionId === currentSessionId) {
+                return; // Skip if session hasn't actually changed
+            }
+            lastSessionId = currentSessionId;
+
             if (mounted) {
                 setSession(session);
                 setUser(session?.user ?? null);
                 setLoading(false);
             }
         });
-        */
 
         return () => {
             mounted = false;
-            // subscription.unsubscribe();
+            subscription.unsubscribe();
         };
-    }, []);
+    }, [isStaticGeneration]);
 
     const signIn = async (email: string, password: string) => {
         const { error } = await supabase.auth.signInWithPassword({

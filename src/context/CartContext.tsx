@@ -19,6 +19,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const [cartItems, setCartItems] = useState<CartItem[]>([]);
     const { user } = useAuth();
 
+    // Skip operations during static generation
+    const isStaticGeneration = typeof window === 'undefined';
+
     const saveCart = (items: CartItem[]) => {
         setCartItems(items);
         localStorage.setItem('cart', JSON.stringify(items));
@@ -29,6 +32,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     };
 
     useEffect(() => {
+        // Skip during static generation
+        if (isStaticGeneration) return;
+
         // Load cart from local storage
         const savedCart = localStorage.getItem('cart');
         if (savedCart) {
@@ -38,15 +44,18 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                 console.error('Failed to parse cart from local storage', e);
             }
         }
-    }, []);
+    }, [isStaticGeneration]);
 
     // Clear cart when user logs out (listen to user state from AuthContext)
     useEffect(() => {
+        // Skip during static generation
+        if (isStaticGeneration) return;
+
         if (!user) {
             setCartItems([]);
             localStorage.removeItem('cart');
         }
-    }, [user]);
+    }, [user, isStaticGeneration]);
 
     const addToCart = (report: Report) => {
         if (isInCart(report.id)) return;

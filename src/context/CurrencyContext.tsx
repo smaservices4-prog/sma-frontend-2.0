@@ -25,7 +25,16 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     const { user } = useAuth();
     const { checkError } = useAuthErrorHandler();
 
+    // Skip operations during static generation
+    const isStaticGeneration = typeof window === 'undefined';
+
     useEffect(() => {
+        // Skip during static generation
+        if (isStaticGeneration) {
+            setLoading(false);
+            return;
+        }
+
         const initializeCurrency = async () => {
             // Load preference from local storage as fallback/initial
             const savedCurrency = localStorage.getItem('preferred_currency') as Currency;
@@ -58,12 +67,14 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
         };
 
         initializeCurrency();
-    }, [user, authErrorHandled]);
+    }, [user, authErrorHandled, isStaticGeneration]);
 
     // Reset auth error flag when user changes
     useEffect(() => {
+        // Skip during static generation
+        if (isStaticGeneration) return;
         setAuthErrorHandled(false);
-    }, [user]);
+    }, [user, isStaticGeneration]);
 
     const setSelectedCurrency = async (currency: Currency) => {
         setSelectedCurrencyState(currency);
