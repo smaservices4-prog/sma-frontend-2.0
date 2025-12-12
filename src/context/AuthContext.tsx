@@ -19,6 +19,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+    console.log('AuthProvider: initializing');
     const [user, setUser] = useState<User | null>(null);
     const [session, setSession] = useState<Session | null>(null);
     const [loading, setLoading] = useState(true);
@@ -27,17 +28,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         let mounted = true;
 
-        // Check active session
+        // Check active session once on mount
         const getSession = async () => {
             try {
-                const { data: { session } } = await supabase.auth.getSession();
+                const { data: { session }, error } = await supabase.auth.getSession();
+                if (error) {
+                    console.error('AuthContext: getSession error:', error);
+                }
                 if (mounted) {
+                    console.log('AuthContext: initial getSession result', session?.user?.id);
                     setSession(session);
                     setUser(session?.user ?? null);
                     setLoading(false);
                 }
             } catch (error) {
-                console.error('Error getting session:', error);
+                console.error('AuthContext: getSession exception:', error);
                 if (mounted) {
                     setLoading(false);
                 }
@@ -46,17 +51,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         getSession();
 
+        // Disable auth state listener for now to test if it's causing the token refresh loop
+        /*
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            console.log('AuthContext: onAuthStateChange triggered', _event, session?.user?.id);
             if (mounted) {
                 setSession(session);
                 setUser(session?.user ?? null);
                 setLoading(false);
             }
         });
+        */
 
         return () => {
             mounted = false;
-            subscription.unsubscribe();
+            // subscription.unsubscribe();
         };
     }, []);
 
