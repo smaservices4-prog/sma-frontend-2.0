@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { Report, CartItem } from '@/types';
 import { useAuth } from './AuthContext';
 
@@ -22,14 +22,16 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     // Skip operations during static generation
     const isStaticGeneration = typeof window === 'undefined';
 
-    const saveCart = (items: CartItem[]) => {
+    const saveCart = useCallback((items: CartItem[]) => {
         setCartItems(items);
-        localStorage.setItem('cart', JSON.stringify(items));
-    };
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('cart', JSON.stringify(items));
+        }
+    }, []);
 
-    const clearCart = () => {
+    const clearCart = useCallback(() => {
         saveCart([]);
-    };
+    }, [saveCart]);
 
     useEffect(() => {
         // Skip during static generation
@@ -53,20 +55,22 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
         if (!user) {
             setCartItems([]);
-            localStorage.removeItem('cart');
+            if (typeof window !== 'undefined') {
+                localStorage.removeItem('cart');
+            }
         }
     }, [user, isStaticGeneration]);
 
-    const addToCart = (report: Report) => {
+    const addToCart = useCallback((report: Report) => {
         if (isInCart(report.id)) return;
         const newItems = [...cartItems, { report, quantity: 1 }];
         saveCart(newItems);
-    };
+    }, [cartItems, saveCart]);
 
-    const removeFromCart = (reportId: string) => {
+    const removeFromCart = useCallback((reportId: string) => {
         const newItems = cartItems.filter(item => item.report.id !== reportId);
         saveCart(newItems);
-    };
+    }, [cartItems, saveCart]);
 
     const getCartItemsCount = () => {
         return cartItems.length;
