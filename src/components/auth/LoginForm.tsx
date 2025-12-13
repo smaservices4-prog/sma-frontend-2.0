@@ -22,7 +22,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 
 import { useAuth } from '@/context/AuthContext';
 import GoogleSignInButton from '@/components/auth/providers/GoogleSignInButton';
-import FacebookSignInButton from '@/components/auth/providers/FacebookSignInButton';
+// import FacebookSignInButton from '@/components/auth/providers/FacebookSignInButton'; // Kept for future use
 import { useAuthFormWidth, commonTextFieldStyles, commonButtonStyles, AuthPageLoader } from '@/components/auth/AccessLayout';
 
 const HiddenMainButton = ({ buttonRef }: { buttonRef: React.Ref<HTMLButtonElement> }) => (
@@ -221,13 +221,14 @@ export default function LoginForm() {
                     widthReady={widthReady}
                     maxWidth={getProviderButtonWidth()}
                 />
-                <Box sx={{ mt: 1 }}>
+                {/* Facebook button removed - logic kept in FacebookSignInButton component */}
+                {/* <Box sx={{ mt: 1 }}>
                     <FacebookSignInButton
                         onError={(msg) => setError(msg)}
                         widthReady={widthReady}
                         maxWidth={getProviderButtonWidth()}
                     />
-                </Box>
+                </Box> */}
             </Box>
 
             <Box sx={{ mt: 2, textAlign: 'center' }}>

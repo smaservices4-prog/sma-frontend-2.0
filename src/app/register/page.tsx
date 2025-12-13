@@ -13,7 +13,7 @@ import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import AccessLayout, { useAuthFormWidth, useEmailValidation, commonTextFieldStyles, commonButtonStyles, AuthPageLoader } from '@/components/auth/AccessLayout';
 import GoogleSignInButton from '@/components/auth/providers/GoogleSignInButton';
-import FacebookSignInButton from '@/components/auth/providers/FacebookSignInButton';
+// import FacebookSignInButton from '@/components/auth/providers/FacebookSignInButton'; // Kept for future use
 import { supabase } from '@/lib/supabase';
 import PasswordRequirements from '@/components/auth/PasswordRequirements';
 
@@ -314,9 +314,10 @@ function RegisterContent() {
                 </Divider>
 
                 <GoogleSignInButton maxWidth={getProviderButtonWidth()} widthReady={widthReady} onSuccess={handleGoogleSuccess} onError={handleGoogleError} />
-                <Box sx={{ mt: 1 }}>
+                {/* Facebook button removed - logic kept in FacebookSignInButton component */}
+                {/* <Box sx={{ mt: 1 }}>
                     <FacebookSignInButton maxWidth={getProviderButtonWidth()} widthReady={widthReady} onError={handleFacebookError} />
-                </Box>
+                </Box> */}
 
                 <Box sx={{ textAlign: 'center', mt: 1.5 }}>
                     <Typography variant="body2" sx={{ color: '#2C1810' }}>
