@@ -50,7 +50,6 @@ function PaypalCheckout({ width = '100%', onLoad }: PaypalCheckoutProps) {
         "clientId": clientId,
         "enable-funding": "paylater,card",
         "disable-funding": "venmo,credit",
-        "buyer-country": "US",
         currency: selectedCurrency,
         intent: "capture",
         "data-page-type": "product-details",
