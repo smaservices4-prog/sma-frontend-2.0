@@ -8,6 +8,7 @@ import { useCart } from "@/context/CartContext";
 import { useCurrency } from "@/context/CurrencyContext";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter, usePathname } from "next/navigation";
+import { useAuthErrorHandler } from '@/hooks/useAuthErrorHandler';
 
 interface PaypalCheckoutProps {
     width?: string | number;
@@ -33,6 +34,7 @@ function PaypalCheckout({ width = '100%', onLoad }: PaypalCheckoutProps) {
     const [message, setMessage] = useState("");
     const [orderId, setOrderId] = useState<string | null>(null);
     const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "";
+    const { checkError } = useAuthErrorHandler();
 
     if (!clientId) {
         return (
@@ -85,9 +87,7 @@ function PaypalCheckout({ width = '100%', onLoad }: PaypalCheckoutProps) {
                 return response.provider_order_id;
             } else {
                 // Check for authentication error
-                if (response.error === 'AUTH_REQUIRED') {
-                    const returnUrl = encodeURIComponent(pathname || '/cart');
-                    router.push(`/login?returnTo=${returnUrl}`);
+                if (checkError(response.error)) {
                     throw new Error("Authentication required");
                 }
                 throw new Error(response.error || 'No se pudo crear la orden de PayPal.');
@@ -147,13 +147,13 @@ function PaypalCheckout({ width = '100%', onLoad }: PaypalCheckoutProps) {
         } catch (error) {
             console.error("Error en onApprove", error);
             setMessage(`Lo sentimos, tu transacción no pudo ser procesada... ${error instanceof Error ? error.message : String(error)}`);
-            router.push('/payment/error');
+            router.push('/payment/failure');
         }
     };
 
     const onError = (err: any) => {
         console.error("PayPal Checkout onError", err);
-        router.push('/payment/error');
+        router.push('/payment/failure');
     };
 
     const onCancel = () => {

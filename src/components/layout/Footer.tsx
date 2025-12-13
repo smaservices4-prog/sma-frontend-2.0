@@ -1,6 +1,3 @@
-'use client';
-
-import React from 'react';
 import { Box, Container, Typography, Link as MuiLink, Grid } from '@mui/material';
 import Link from 'next/link';
 
@@ -18,6 +15,7 @@ export default function Footer() {
                             <br />
                             Tu fuente confiable de información mensual.
                         </Typography>
+                        
                     </Grid>
                     <Grid size={{ xs: 12, sm: 4 }}>
                         <Typography variant="h6" color="text.primary" gutterBottom>

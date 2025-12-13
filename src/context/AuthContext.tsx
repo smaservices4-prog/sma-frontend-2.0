@@ -19,31 +19,73 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+    // Prevent auth operations during static generation
+    const isStaticGeneration = typeof window === 'undefined';
+
     const [user, setUser] = useState<User | null>(null);
     const [session, setSession] = useState<Session | null>(null);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
 
     useEffect(() => {
-        // Check active session
-        const getSession = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            setSession(session);
-            setUser(session?.user ?? null);
+        // Skip auth operations during static generation
+        if (isStaticGeneration) {
             setLoading(false);
+            return;
+        }
+
+        let mounted = true;
+
+        // Check active session once on mount
+        const getSession = async () => {
+            try {
+                const { data: { session }, error } = await supabase.auth.getSession();
+                if (error) {
+                    console.error('AuthContext: getSession error:', error);
+                }
+                if (mounted) {
+                    setSession(session);
+                    setUser(session?.user ?? null);
+                    setLoading(false);
+                }
+            } catch (error) {
+                console.error('AuthContext: getSession exception:', error);
+                if (mounted) {
+                    setLoading(false);
+                }
+            }
         };
 
         getSession();
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            setSession(session);
-            setUser(session?.user ?? null);
-            setLoading(false);
-            router.refresh();
+        // Auth state listener - the issue might be that this listener itself triggers token refreshes
+        // Let's try a different approach: only listen to SIGNED_IN and SIGNED_OUT events
+        let lastSessionId: string | null = null;
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            // Only process SIGNED_IN and SIGNED_OUT events to avoid TOKEN_REFRESHED loops
+            if (event !== 'SIGNED_IN' && event !== 'SIGNED_OUT') {
+                return;
+            }
+
+            // Prevent duplicate updates for the same session
+            const currentSessionId = session?.user?.id || null;
+            if (lastSessionId === currentSessionId) {
+                return; // Skip if session hasn't actually changed
+            }
+            lastSessionId = currentSessionId;
+
+            if (mounted) {
+                setSession(session);
+                setUser(session?.user ?? null);
+                setLoading(false);
+            }
         });
 
-        return () => subscription.unsubscribe();
-    }, []);
+        return () => {
+            mounted = false;
+            subscription.unsubscribe();
+        };
+    }, [isStaticGeneration]);
 
     const signIn = async (email: string, password: string) => {
         const { error } = await supabase.auth.signInWithPassword({

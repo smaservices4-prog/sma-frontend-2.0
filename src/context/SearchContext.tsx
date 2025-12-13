@@ -24,8 +24,8 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
         const fetchReports = async () => {
             setLoading(true);
             try {
-                const reports = await reportsApi.getAll();
-                setAllReports(reports);
+                const response = await reportsApi.getAll();
+                setAllReports(response.reports);
             } catch (error) {
                 console.error('Failed to fetch reports:', error);
             } finally {

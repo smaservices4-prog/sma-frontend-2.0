@@ -3,7 +3,7 @@
 import { Box, Typography, Button } from '@mui/material';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Suspense, useEffect } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useCart } from '@/context/CartContext';
 
 function SuccessContent() {
@@ -11,6 +11,7 @@ function SuccessContent() {
     // Check for MercadoPago external_reference parameter (maps to order_id) or direct order_id
     const orderId = searchParams.get('external_reference') || searchParams.get('order_id');
     const { clearCart } = useCart();
+    const [displayOrderId, setDisplayOrderId] = useState<string | null>(orderId);
 
     useEffect(() => {
         // Clear cart when payment is successful
@@ -21,10 +22,14 @@ function SuccessContent() {
         if (pendingOrderId) {
             localStorage.removeItem('pending_order_id');
         }
-    }, [clearCart]);
 
-    // If no order_id from query params, try to get from localStorage
-    const displayOrderId = orderId || localStorage.getItem('pending_order_id');
+        // Set display order ID from localStorage if not available from query params
+        if (!orderId) {
+            const fallbackOrderId = localStorage.getItem('pending_order_id');
+            setDisplayOrderId(fallbackOrderId);
+        }
+    }, [clearCart, orderId]);
+
 
     return (
         <Box sx={{ textAlign: 'center', mt: 8, p: 2 }}>

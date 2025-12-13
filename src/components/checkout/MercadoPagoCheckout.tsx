@@ -7,6 +7,7 @@ import { useCart } from "@/context/CartContext";
 import { useCurrency } from "@/context/CurrencyContext";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter, usePathname } from "next/navigation";
+import { useAuthErrorHandler } from '@/hooks/useAuthErrorHandler';
 // We need to import the logo. For now, I'll use a placeholder text or try to copy the asset later.
 // import MercadoPagoLogo from '../../assets/MP_RGB_HANDSHAKE_pluma_horizontal.svg';
 
@@ -30,6 +31,7 @@ const MercadoPagoCheckout = ({
     const pathname = usePathname();
     const [isLoading, setIsLoading] = useState(false);
     const [message, setMessage] = useState("");
+    const { checkError } = useAuthErrorHandler();
 
     // Simulate component loading
     useEffect(() => {
@@ -70,20 +72,17 @@ const MercadoPagoCheckout = ({
                 window.location.href = response.checkout_url;
             } else {
                 // Check for authentication error
-                if (response.error === 'AUTH_REQUIRED') {
-                    const returnUrl = encodeURIComponent(pathname || '/cart');
-                    router.push(`/login?returnTo=${returnUrl}`);
+                if (checkError(response.error)) {
                     return;
                 }
                 throw new Error(response.error || 'No se pudo crear la orden de MercadoPago.');
             }
         } catch (error) {
             console.error("Error al crear la orden de MercadoPago:", error);
-            if (error instanceof Error && error.message.includes('AUTH_REQUIRED')) {
-                const returnUrl = encodeURIComponent(pathname || '/cart');
-                router.push(`/login?returnTo=${returnUrl}`);
-            } else {
-                setMessage("Error al procesar el pago. Por favor, intente nuevamente.");
+            if (!checkError(error)) {
+                // Redirect to failure page with error details
+                const errorMessage = error instanceof Error ? error.message : "Error al procesar el pago";
+                router.push(`/payment/failure?error=${encodeURIComponent(errorMessage)}`);
             }
         } finally {
             setIsLoading(false);

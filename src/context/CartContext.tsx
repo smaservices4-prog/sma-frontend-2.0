@@ -1,8 +1,8 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { Report, CartItem } from '@/types';
-import { supabase } from '@/lib/supabase';
+import { useAuth } from './AuthContext';
 
 interface CartContextType {
     cartItems: CartItem[];
@@ -17,17 +17,26 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
     const [cartItems, setCartItems] = useState<CartItem[]>([]);
+    const { user } = useAuth();
 
-    const saveCart = (items: CartItem[]) => {
+    // Skip operations during static generation
+    const isStaticGeneration = typeof window === 'undefined';
+
+    const saveCart = useCallback((items: CartItem[]) => {
         setCartItems(items);
-        localStorage.setItem('cart', JSON.stringify(items));
-    };
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('cart', JSON.stringify(items));
+        }
+    }, []);
 
-    const clearCart = () => {
+    const clearCart = useCallback(() => {
         saveCart([]);
-    };
+    }, [saveCart]);
 
     useEffect(() => {
+        // Skip during static generation
+        if (isStaticGeneration) return;
+
         // Load cart from local storage
         const savedCart = localStorage.getItem('cart');
         if (savedCart) {
@@ -37,28 +46,31 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                 console.error('Failed to parse cart from local storage', e);
             }
         }
+    }, [isStaticGeneration]);
 
-        // Listen to auth state changes and clear cart on logout
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-            if (event === 'SIGNED_OUT' || !session) {
-                setCartItems([]);
+    // Clear cart when user logs out (listen to user state from AuthContext)
+    useEffect(() => {
+        // Skip during static generation
+        if (isStaticGeneration) return;
+
+        if (!user) {
+            setCartItems([]);
+            if (typeof window !== 'undefined') {
                 localStorage.removeItem('cart');
             }
-        });
+        }
+    }, [user, isStaticGeneration]);
 
-        return () => subscription.unsubscribe();
-    }, []);
-
-    const addToCart = (report: Report) => {
+    const addToCart = useCallback((report: Report) => {
         if (isInCart(report.id)) return;
         const newItems = [...cartItems, { report, quantity: 1 }];
         saveCart(newItems);
-    };
+    }, [cartItems, saveCart]);
 
-    const removeFromCart = (reportId: string) => {
+    const removeFromCart = useCallback((reportId: string) => {
         const newItems = cartItems.filter(item => item.report.id !== reportId);
         saveCart(newItems);
-    };
+    }, [cartItems, saveCart]);
 
     const getCartItemsCount = () => {
         return cartItems.length;

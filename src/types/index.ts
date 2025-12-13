@@ -21,6 +21,9 @@ export interface ReportsResponse {
     user_authenticated: boolean;
     total_reports: number;
     reports: Report[];
+    page: number;
+    per_page: number;
+    total_pages: number;
 }
 
 export interface CartItem {
@@ -54,12 +57,12 @@ export interface CreateOrderRequest {
 
 export interface CreateOrderResponse {
     success: boolean;
-    order_id: string;
-    checkout_url: string;
-    provider_order_id: string;
-    total_amount: number;
-    currency: string;
-    expires_at: string;
+    order_id?: string;
+    checkout_url?: string;
+    provider_order_id?: string;
+    total_amount?: number;
+    currency?: string;
+    expires_at?: string;
     error?: string;
 }
 

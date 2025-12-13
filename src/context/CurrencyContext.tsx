@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useExchangeRates } from './ExchangeRateContext';
 import { useAuth } from './AuthContext';
 import { userPreferencesApi } from '@/api/userPreferences';
+import { useAuthErrorHandler } from '@/hooks/useAuthErrorHandler';
 
 type Currency = 'USD' | 'ARS' | 'EUR';
 
@@ -19,10 +20,21 @@ const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined
 export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     const [selectedCurrency, setSelectedCurrencyState] = useState<Currency>('USD');
     const [loading, setLoading] = useState(true);
+    const [authErrorHandled, setAuthErrorHandled] = useState(false);
     const { formatPriceWithConversion } = useExchangeRates();
     const { user } = useAuth();
+    const { checkError } = useAuthErrorHandler();
+
+    // Skip operations during static generation
+    const isStaticGeneration = typeof window === 'undefined';
 
     useEffect(() => {
+        // Skip during static generation
+        if (isStaticGeneration) {
+            setLoading(false);
+            return;
+        }
+
         const initializeCurrency = async () => {
             // Load preference from local storage as fallback/initial
             const savedCurrency = localStorage.getItem('preferred_currency') as Currency;
@@ -30,10 +42,18 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
                 setSelectedCurrencyState(savedCurrency);
             }
 
-            // If user is logged in, fetch from API
-            if (user) {
+            // If user is logged in and we haven't already handled an auth error, fetch from API
+            if (user && !authErrorHandled) {
                 try {
                     const preferences = await userPreferencesApi.getPreferences();
+                    // Check for auth errors
+                    if (preferences && typeof preferences === 'object' && 'error' in preferences) {
+                        const errorHandled = checkError(preferences.error);
+                        if (errorHandled) {
+                            setAuthErrorHandled(true); // Prevent further API calls
+                        }
+                        return; // Exit early if auth error was handled
+                    }
                     if (preferences?.preferred_currency && ['USD', 'ARS', 'EUR'].includes(preferences.preferred_currency)) {
                         setSelectedCurrencyState(preferences.preferred_currency);
                         // Sync local storage
@@ -47,15 +67,29 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
         };
 
         initializeCurrency();
-    }, [user]);
+    }, [user, authErrorHandled, isStaticGeneration]);
+
+    // Reset auth error flag when user changes
+    useEffect(() => {
+        // Skip during static generation
+        if (isStaticGeneration) return;
+        setAuthErrorHandled(false);
+    }, [user, isStaticGeneration]);
 
     const setSelectedCurrency = async (currency: Currency) => {
         setSelectedCurrencyState(currency);
         localStorage.setItem('preferred_currency', currency);
 
-        if (user) {
+        if (user && !authErrorHandled) {
             try {
-                await userPreferencesApi.updatePreferences({ preferred_currency: currency });
+                const result = await userPreferencesApi.updatePreferences({ preferred_currency: currency });
+                // Check for auth errors
+                if (result && typeof result === 'object' && 'error' in result) {
+                    const errorHandled = checkError(result.error);
+                    if (errorHandled) {
+                        setAuthErrorHandled(true);
+                    }
+                }
             } catch (error) {
                 console.error('Failed to update user preferences:', error);
             }

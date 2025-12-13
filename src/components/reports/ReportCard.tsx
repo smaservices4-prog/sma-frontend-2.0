@@ -10,33 +10,68 @@ import {
     Box,
     Chip,
     useTheme,
+    IconButton,
 } from '@mui/material';
-import { ShoppingCart, Download, Check, Visibility } from '@mui/icons-material';
+import { ShoppingCart, Download, Check, Visibility, Edit, Delete } from '@mui/icons-material';
 import { Report } from '@/types';
 import { useCurrency } from '@/context/CurrencyContext';
 import { useCart } from '@/context/CartContext';
 import { useRouter } from 'next/navigation';
+import { reportsApi } from '@/api/reports';
+import { useState } from 'react';
+import { useAuthErrorHandler } from '@/hooks/useAuthErrorHandler';
+
+function formatMonthLabel(monthIso: string) {
+    const [year, month] = monthIso.split('-');
+    const date = new Date(Number(year), Number(month) - 1, 1);
+    return date.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+}
 
 interface ReportCardProps {
     report: Report;
+    adminView?: boolean;
+    onEdit?: (report: Report) => void;
+    onDelete?: (reportId: string) => void;
 }
 
-export default function ReportCard({ report }: ReportCardProps) {
+export default function ReportCard({ report, adminView = false, onEdit, onDelete }: ReportCardProps) {
     const theme = useTheme();
     const { selectedCurrency } = useCurrency();
     const { addToCart, removeFromCart, isInCart } = useCart();
     const router = useRouter();
+    const [isPurchasingFree, setIsPurchasingFree] = useState(false);
+    const { checkError } = useAuthErrorHandler();
 
     const priceObj = report.prices.find((p) => p.currency === selectedCurrency) || report.prices[0];
     const price = priceObj?.amount || 0;
     const currencySymbol = selectedCurrency === 'EUR' ? '€' : '$';
+    const isFree = price === 0;
 
     const inCart = isInCart(report.id);
     const purchased = report.purchased;
 
-    const handleAction = () => {
-        if (purchased) {
+    const handleAction = async () => {
+        if (adminView && onEdit) {
+            onEdit(report);
+        } else if (purchased) {
             router.push(`/reports/read/${report.id}`);
+        } else if (isFree) {
+            // Handle free report purchase
+            setIsPurchasingFree(true);
+            try {
+                const result = await reportsApi.purchaseFreeReport(report.id);
+                if (result.success) {
+                    // Redirect to reader on successful free purchase
+                    router.push(`/reports/read/${report.id}`);
+                } else if (!checkError(result.error)) {
+                    console.error('Failed to purchase free report:', result.error);
+                    // Could show error toast here
+                }
+            } catch (error) {
+                console.error('Error purchasing free report:', error);
+            } finally {
+                setIsPurchasingFree(false);
+            }
         } else if (inCart) {
             removeFromCart(report.id);
         } else {
@@ -44,7 +79,13 @@ export default function ReportCard({ report }: ReportCardProps) {
         }
     };
 
+    const handleDelete = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (onDelete) onDelete(report.id);
+    };
+
     return (
+        <>
         <Card
             sx={{
                 height: '100%',
@@ -56,13 +97,15 @@ export default function ReportCard({ report }: ReportCardProps) {
                     transform: 'translateY(-4px)',
                     boxShadow: 6, // SHADOW_MD/LG
                 },
-                border: inCart ? `2px solid ${theme.palette.primary.main}` : '1px solid #E5E5E5',
+                border: adminView 
+                    ? '1px solid #FF8C42' // Orange border for admin
+                    : (inCart ? `2px solid ${theme.palette.primary.main}` : '1px solid #E5E5E5'),
             }}
             elevation={inCart ? 3 : 1}
         >
             {/* Badges */}
             <Box sx={{ position: 'absolute', top: 12, right: 12, zIndex: 1, display: 'flex', gap: 1 }}>
-                {purchased && (
+                {purchased && !adminView && (
                     <Chip
                         label="Comprado"
                         color="success"
@@ -71,12 +114,20 @@ export default function ReportCard({ report }: ReportCardProps) {
                         sx={{ fontWeight: 'bold' }}
                     />
                 )}
-                {inCart && !purchased && (
+                {inCart && !purchased && !adminView && (
                     <Chip
                         label="En carrito"
                         color="primary"
                         size="small"
                         icon={<ShoppingCart sx={{ fontSize: 16 }} />}
+                        sx={{ fontWeight: 'bold' }}
+                    />
+                )}
+                {adminView && (
+                     <Chip
+                        label="Admin"
+                        color="warning"
+                        size="small"
                         sx={{ fontWeight: 'bold' }}
                     />
                 )}
@@ -96,29 +147,57 @@ export default function ReportCard({ report }: ReportCardProps) {
                 </Typography>
 
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    {new Date(report.month).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
+                    {formatMonthLabel(report.month)}
                 </Typography>
 
                 <Box sx={{ mt: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <Typography variant="h6" color="primary.main" sx={{ fontWeight: 700 }}>
-                        {!purchased ? `${currencySymbol}${price}` : 'Leer'}
+                        {purchased && !adminView ? 'Leer' :
+                         isFree ? 'GRATIS' :
+                         `${currencySymbol}${price}`}
                     </Typography>
 
-                    <Button
-                        variant={inCart ? "outlined" : "contained"}
-                        color={purchased ? "success" : "primary"}
-                        onClick={handleAction}
-                        startIcon={purchased ? <Visibility /> : (inCart ? <ShoppingCart /> : <ShoppingCart />)}
-                        size="small"
-                        sx={{
-                            minWidth: 120,
-                            fontWeight: 600,
-                        }}
-                    >
-                        {purchased ? 'Leer' : (inCart ? 'Quitar' : 'Agregar')}
-                    </Button>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                        {adminView && onDelete && (
+                            <IconButton
+                                onClick={handleDelete}
+                                size="small"
+                                sx={{ 
+                                    color: 'error.main', 
+                                    border: '1px solid', 
+                                    borderColor: 'error.main',
+                                    '&:hover': { backgroundColor: 'rgba(211, 47, 47, 0.04)' }
+                                }}
+                            >
+                                <Delete />
+                            </IconButton>
+                        )}
+
+                        <Button
+                            variant={inCart && !adminView ? "outlined" : "contained"}
+                            color={purchased && !adminView ? "success" : (adminView ? "warning" : "primary")}
+                            onClick={handleAction}
+                            disabled={isPurchasingFree}
+                            startIcon={
+                                adminView ? <Edit /> :
+                                (purchased ? <Visibility /> :
+                                 !isFree ? <ShoppingCart /> : null)
+                            }
+                            size="small"
+                            sx={{
+                                minWidth: adminView ? 100 : 120,
+                                fontWeight: 600,
+                            }}
+                        >
+                            {adminView ? 'Editar' :
+                             (purchased ? 'Leer' :
+                              (isFree ? (isPurchasingFree ? 'Obteniendo...' : 'Obtener Gratis') :
+                               (inCart ? 'Quitar' : 'Agregar')))}
+                        </Button>
+                    </Box>
                 </Box>
             </CardContent>
         </Card>
+        </>
     );
 }
