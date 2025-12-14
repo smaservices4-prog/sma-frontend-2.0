@@ -1,6 +1,43 @@
 import { supabase } from '@/lib/supabase';
 import { AdminFileItem } from '@/types';
 
+/**
+ * Extracts the HTTP status code from Supabase error message
+ * Supabase FunctionsHttpError messages are formatted like: "non-2xx status code: 401"
+ */
+function extractStatusCode(errorMessage?: string): number | null {
+    if (!errorMessage) return null;
+    const match = errorMessage.match(/status code:\s*(\d+)/);
+    return match ? parseInt(match[1], 10) : null;
+}
+
+/**
+ * Checks if an error is an authentication error (4xx client errors)
+ * Only 4xx errors should trigger re-authentication, not 5xx server errors
+ */
+function isAuthError(error: any): boolean {
+    // Check explicit 401/403 status
+    if (error.status === 401 || error.status === 403) {
+        return true;
+    }
+    if ((error as any).context?.status === 401 || (error as any).context?.status === 403) {
+        return true;
+    }
+    
+    // Extract status from error message and check if it's 4xx
+    const statusCode = extractStatusCode(error.message);
+    if (statusCode && statusCode >= 400 && statusCode < 500) {
+        return true;
+    }
+    
+    // Check for explicit auth-related messages
+    if (error.message?.includes('auth') || error.message?.includes('unauthorized')) {
+        return true;
+    }
+    
+    return false;
+}
+
 export interface UploadFileRequest {
     action: 'uploadFile';
     file: {
@@ -69,13 +106,8 @@ export const storageApi = {
         });
 
         if (error) {
-            // Check for authentication errors
-            // Supabase FunctionsHttpError doesn't expose status directly, so check message
-            if (error.message?.includes('non-2xx status code') ||
-                error.status === 401 ||
-                error.message?.includes('auth') ||
-                error.message?.includes('unauthorized') ||
-                (error as any).context?.status === 401) {
+            // Check for authentication errors (4xx only, not 5xx server errors)
+            if (isAuthError(error)) {
                 return { error: 'AUTH_REQUIRED' };
             }
             throw error;
@@ -95,13 +127,8 @@ export const storageApi = {
         });
 
         if (error) {
-            // Check for authentication errors
-            // Supabase FunctionsHttpError doesn't expose status directly, so check message
-            if (error.message?.includes('non-2xx status code') ||
-                error.status === 401 ||
-                error.message?.includes('auth') ||
-                error.message?.includes('unauthorized') ||
-                (error as any).context?.status === 401) {
+            // Check for authentication errors (4xx only, not 5xx server errors)
+            if (isAuthError(error)) {
                 return { error: 'AUTH_REQUIRED' };
             }
             throw error;
@@ -123,13 +150,8 @@ export const storageApi = {
         });
 
         if (error) {
-            // Check for authentication errors
-            // Supabase FunctionsHttpError doesn't expose status directly, so check message
-            if (error.message?.includes('non-2xx status code') ||
-                error.status === 401 ||
-                error.message?.includes('auth') ||
-                error.message?.includes('unauthorized') ||
-                (error as any).context?.status === 401) {
+            // Check for authentication errors (4xx only, not 5xx server errors)
+            if (isAuthError(error)) {
                 return { error: 'AUTH_REQUIRED' };
             }
             throw error;
@@ -152,19 +174,14 @@ export const storageApi = {
         });
 
         if (error) {
-            // Check for authentication errors
-            // Supabase FunctionsHttpError doesn't expose status directly, so check message
-            if (error.message?.includes('non-2xx status code') ||
-                error.status === 401 ||
-                error.message?.includes('auth') ||
-                error.message?.includes('unauthorized') ||
-                (error as any).context?.status === 401) {
+            // Check for authentication errors (4xx only, not 5xx server errors)
+            if (isAuthError(error)) {
                 return { error: 'AUTH_REQUIRED' };
             }
             // Check for forbidden access (e.g. purchases exist)
-             if (error.status === 403 || (error as any).context?.status === 403) {
-                 return { error: 'FORBIDDEN' };
-             }
+            if (error.status === 403 || (error as any).context?.status === 403) {
+                return { error: 'FORBIDDEN' };
+            }
             throw error;
         }
 
@@ -185,13 +202,8 @@ export const storageApi = {
         });
 
         if (error) {
-            // Check for authentication errors
-            // Supabase FunctionsHttpError doesn't expose status directly, so check message
-            if (error.message?.includes('non-2xx status code') ||
-                error.status === 401 ||
-                error.message?.includes('auth') ||
-                error.message?.includes('unauthorized') ||
-                (error as any).context?.status === 401) {
+            // Check for authentication errors (4xx only, not 5xx server errors)
+            if (isAuthError(error)) {
                 return { error: 'AUTH_REQUIRED' };
             }
             throw error;
@@ -215,13 +227,8 @@ export const storageApi = {
         });
 
         if (error) {
-            // Check for authentication errors
-            // Supabase FunctionsHttpError doesn't expose status directly, so check message
-            if (error.message?.includes('non-2xx status code') ||
-                error.status === 401 ||
-                error.message?.includes('auth') ||
-                error.message?.includes('unauthorized') ||
-                (error as any).context?.status === 401) {
+            // Check for authentication errors (4xx only, not 5xx server errors)
+            if (isAuthError(error)) {
                 return { error: 'AUTH_REQUIRED' };
             }
             throw error;
@@ -244,13 +251,8 @@ export const storageApi = {
             });
 
             if (error) {
-                // Check for authentication errors
-                // Supabase FunctionsHttpError doesn't expose status directly, so check message
-                if (error.message?.includes('non-2xx status code') ||
-                    error.status === 401 ||
-                    error.message?.includes('auth') ||
-                    error.message?.includes('unauthorized') ||
-                    (error as any).context?.status === 401) {
+                // Check for authentication errors (4xx only, not 5xx server errors)
+                if (isAuthError(error)) {
                     return { error: 'AUTH_REQUIRED' };
                 }
                 console.error('Admin verification failed:', error);
@@ -265,11 +267,7 @@ export const storageApi = {
             return data?.is_admin === true;
         } catch (err: any) {
             // Check if the caught exception is an auth error
-            if (err.message?.includes('non-2xx status code') ||
-                err.status === 401 ||
-                err.message?.includes('auth') ||
-                err.message?.includes('unauthorized') ||
-                err.context?.status === 401) {
+            if (isAuthError(err)) {
                 return { error: 'AUTH_REQUIRED' };
             }
             console.error('Admin verification error:', err);

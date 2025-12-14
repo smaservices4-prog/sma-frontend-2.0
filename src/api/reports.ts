@@ -3,6 +3,24 @@ import { Report, ReportsResponse } from '@/types';
 import { mockReports } from './mockData';
 import { SupabaseClient } from '@supabase/supabase-js';
 
+/**
+ * Checks if an error is an authentication error (4xx client errors)
+ * Only 4xx errors should trigger re-authentication, not 5xx server errors
+ */
+function isAuthError(error: any): boolean {
+    // Check explicit 401/403 status
+    if (error.status === 401 || error.status === 403) {
+        return true;
+    }
+    
+    // Check for explicit auth-related messages
+    if (error.message?.includes('auth') || error.message?.includes('unauthorized')) {
+        return true;
+    }
+    
+    return false;
+}
+
 interface GetReportsOptions {
     page?: number;
     perPage?: number;
@@ -90,7 +108,7 @@ export const reportsApi = {
 
             if (error) {
                 // Check if it's an authentication error
-                if (error.status === 401 || error.message?.includes('auth') || error.message?.includes('unauthorized')) {
+                if (isAuthError(error)) {
                     return { 
                         success: false, 
                         error: 'AUTH_REQUIRED'
@@ -102,7 +120,7 @@ export const reportsApi = {
         } catch (err: any) {
             console.error('Error creating order:', err);
             // Check for authentication errors in the catch block too
-            if (err.status === 401 || err.message?.includes('auth') || err.message?.includes('unauthorized')) {
+            if (isAuthError(err)) {
                 return { 
                     success: false, 
                     error: 'AUTH_REQUIRED'
@@ -178,7 +196,7 @@ export const reportsApi = {
             });
 
             if (error) {
-                if (error.status === 401 || error.message?.includes('auth') || error.message?.includes('unauthorized')) {
+                if (isAuthError(error)) {
                     return {
                         success: false,
                         error: 'AUTH_REQUIRED'
@@ -190,7 +208,7 @@ export const reportsApi = {
             return data;
         } catch (err: any) {
             console.error('Error purchasing free report:', err);
-            if (err.status === 401 || err.message?.includes('auth') || err.message?.includes('unauthorized')) {
+            if (isAuthError(err)) {
                 return {
                     success: false,
                     error: 'AUTH_REQUIRED'
