@@ -38,6 +38,44 @@ function isAuthError(error: any): boolean {
     return false;
 }
 
+/**
+ * Safely extracts a user-friendly error message from an error object
+ * Prefers backend error messages if available and they don't expose critical info
+ * Falls back to a generic Spanish message for server errors
+ */
+function getErrorMessage(error: any): string {
+    // Try to get error details from context (Supabase error structure)
+    if (error?.context?.response?.data) {
+        const responseData = error.context.response.data;
+        
+        // If backend returned a structured error with a user-friendly message
+        if (responseData.error && typeof responseData.error === 'string') {
+            // Check if it's a safe message (not exposing internals)
+            // Safe if: not "Internal", not starting with stack traces, etc.
+            if (!responseData.error.includes('Internal') && 
+                !responseData.error.includes('Stack') &&
+                !responseData.error.includes('at ') &&
+                responseData.error.length < 500) {
+                return responseData.error;
+            }
+        }
+        
+        // Alternative: check for details field (which might contain user-friendly info)
+        if (responseData.details && typeof responseData.details === 'string') {
+            if (!responseData.details.includes('Internal') && 
+                !responseData.details.includes('Stack') &&
+                !responseData.details.includes('at ') &&
+                responseData.details.length < 500) {
+                return responseData.details;
+            }
+        }
+    }
+    
+    // Generic fallback for server errors
+    return 'Ha ocurrido un error en el servidor. Por favor, intenta nuevamente más tarde.';
+}
+
+
 export interface UploadFileRequest {
     action: 'uploadFile';
     file: {
@@ -110,7 +148,8 @@ export const storageApi = {
             if (isAuthError(error)) {
                 return { error: 'AUTH_REQUIRED' };
             }
-            throw error;
+            // For other errors, extract user-friendly message
+            return { error: getErrorMessage(error) };
         }
 
         // Check if backend returned an auth error
@@ -131,7 +170,8 @@ export const storageApi = {
             if (isAuthError(error)) {
                 return { error: 'AUTH_REQUIRED' };
             }
-            throw error;
+            // For other errors, extract user-friendly message
+            return { error: getErrorMessage(error) };
         }
 
         // Check if backend returned an auth error
@@ -154,7 +194,8 @@ export const storageApi = {
             if (isAuthError(error)) {
                 return { error: 'AUTH_REQUIRED' };
             }
-            throw error;
+            // For other errors, extract user-friendly message
+            return { error: getErrorMessage(error) };
         }
 
         // Check if backend returned an auth error
@@ -180,9 +221,10 @@ export const storageApi = {
             }
             // Check for forbidden access (e.g. purchases exist)
             if (error.status === 403 || (error as any).context?.status === 403) {
-                return { error: 'FORBIDDEN' };
+                return { error: getErrorMessage(error) };
             }
-            throw error;
+            // For other errors, extract user-friendly message
+            return { error: getErrorMessage(error) };
         }
 
         // Check if backend returned an auth error
@@ -206,7 +248,8 @@ export const storageApi = {
             if (isAuthError(error)) {
                 return { error: 'AUTH_REQUIRED' };
             }
-            throw error;
+            // For other errors, extract user-friendly message
+            return { error: getErrorMessage(error) };
         }
 
         // Check if backend returned an auth error
@@ -231,7 +274,8 @@ export const storageApi = {
             if (isAuthError(error)) {
                 return { error: 'AUTH_REQUIRED' };
             }
-            throw error;
+            // For other errors, extract user-friendly message
+            return { error: getErrorMessage(error) };
         }
 
         // Check if backend returned an auth error
@@ -256,7 +300,8 @@ export const storageApi = {
                     return { error: 'AUTH_REQUIRED' };
                 }
                 console.error('Admin verification failed:', error);
-                return false;
+                // For other errors, extract user-friendly message
+                return { error: getErrorMessage(error) };
             }
 
             // Check if backend returned an auth error
