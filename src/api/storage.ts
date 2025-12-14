@@ -143,11 +143,11 @@ export const storageApi = {
         return data;
     },
 
-    deleteFile: async (filePath: string) => {
+    deleteReport: async (reportId: string) => {
         const { data, error } = await supabase.functions.invoke('admin-storage', {
             body: {
-                action: 'deleteFile',
-                filePath,
+                action: 'deleteReport',
+                report_id: reportId,
             },
         });
 
@@ -161,6 +161,10 @@ export const storageApi = {
                 (error as any).context?.status === 401) {
                 return { error: 'AUTH_REQUIRED' };
             }
+            // Check for forbidden access (e.g. purchases exist)
+             if (error.status === 403 || (error as any).context?.status === 403) {
+                 return { error: 'FORBIDDEN' };
+             }
             throw error;
         }
 

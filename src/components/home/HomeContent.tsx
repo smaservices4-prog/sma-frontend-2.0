@@ -10,6 +10,7 @@ import { PaginationInfo, Report } from '@/types';
 import { useAdmin } from '@/hooks/useAdmin';
 import ReportUploadDialog from '@/components/admin/ReportUploadDialog';
 import ReportEditDialog from '@/components/admin/ReportEditDialog';
+import ReportDeleteDialog from '@/components/admin/ReportDeleteDialog';
 import { storageApi } from '@/api/storage';
 import { useFilters } from '@/context/FilterContext';
 import { reportsApi } from '@/api/reports';
@@ -70,6 +71,7 @@ export default function HomeContent({ initialReports, initialPagination }: HomeC
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
 
   const handleAdminToggle = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -86,26 +88,11 @@ export default function HomeContent({ initialReports, initialPagination }: HomeC
       setEditOpen(true);
   };
 
-  const handleDeleteReport = async (reportId: string) => {
-      if (confirm('¿Estás seguro de que deseas eliminar este reporte? Esta acción no se puede deshacer.')) {
-          try {
-             const report = filteredReports.find(r => r.id === reportId);
-             // Cast to any to access file_path which should be present from backend but might be missing in type definition
-             if (report && (report as any).file_path) {
-                 const deleteResult = await storageApi.deleteFile((report as any).file_path);
-                 // Check for auth errors
-                 if (deleteResult && typeof deleteResult === 'object' && 'error' in deleteResult) {
-                     checkError(deleteResult.error);
-                     return; // Exit early if auth error was handled
-                 }
-                 // Optimistic update or refresh
-                 handleRefresh();
-             } else {
-                 alert('No se pudo encontrar la ruta del archivo para eliminar.');
-             }
-          } catch (error: any) {
-              alert('Error al eliminar: ' + error.message);
-          }
+  const handleDeleteReport = (reportId: string) => {
+      const report = filteredReports.find(r => r.id === reportId);
+      if (report) {
+          setSelectedReport(report);
+          setDeleteOpen(true);
       }
   };
 
@@ -276,6 +263,16 @@ export default function HomeContent({ initialReports, initialPagination }: HomeC
           }}
           report={selectedReport}
           onUpdateSuccess={handleRefresh}
+      />
+
+      <ReportDeleteDialog
+          open={deleteOpen}
+          onClose={() => {
+              setDeleteOpen(false);
+              setSelectedReport(null);
+          }}
+          report={selectedReport}
+          onDeleteSuccess={handleRefresh}
       />
 
       {/* Mobile filters sheet */}
