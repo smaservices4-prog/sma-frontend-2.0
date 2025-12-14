@@ -26,12 +26,58 @@ function isAuthError(error: any): boolean {
  * Prefers backend error messages if available and they don't expose critical info
  * Falls back to a generic Spanish message for server errors
  */
-function getErrorMessage(error: any): string {
-    // Try to get error details from context (Supabase error structure)
-    if (error?.context?.response?.data) {
-        const responseData = error.context.response.data;
-        
+async function getErrorMessage(error: any): Promise<string> {
+    let responseData = null;
+    
+    // The error.context is the Fetch API Response object
+    if (error?.context instanceof Response) {
+        try {
+            // Clone the response to read the body (Response body can only be read once)
+            const responseClone = error.context.clone();
+            const bodyText = await responseClone.text();
+            
+            if (bodyText) {
+                try {
+                    responseData = JSON.parse(bodyText);
+                } catch (e) {
+                    // Body is not JSON, ignore
+                }
+            }
+        } catch (e) {
+            // Could not read response body, continue to fallbacks
+        }
+    }
+    
+    // Fallback to other locations if the above didn't work
+    if (!responseData) {
+        // 1. Direct data property
+        if (error?.data) {
+            responseData = error.data;
+        }
+        // 2. Context response data
+        else if (error?.context?.response?.data) {
+            responseData = error.context.response.data;
+        }
+        // 3. Direct JSON in context
+        else if (error?.context?.data) {
+            responseData = error.context.data;
+        }
+        // 4. Parse JSON from error message if it contains JSON
+        else if (error?.message && error.message.includes('{')) {
+            try {
+                const jsonMatch = error.message.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                    responseData = JSON.parse(jsonMatch[0]);
+                }
+            } catch (e) {
+                // Could not parse JSON from error message
+            }
+        }
+    }
+    
+    if (responseData) {
         // If backend returned a structured error with a user-friendly message
+        // Handle both { error: "message" } and { success: false, error: "message" }
         if (responseData.error && typeof responseData.error === 'string') {
             // Check if it's a safe message (not exposing internals)
             if (!responseData.error.includes('Internal') && 
@@ -42,13 +88,23 @@ function getErrorMessage(error: any): string {
             }
         }
         
-        // Alternative: check for details field (which might contain user-friendly info)
+        // Alternative: check for details field
         if (responseData.details && typeof responseData.details === 'string') {
             if (!responseData.details.includes('Internal') && 
                 !responseData.details.includes('Stack') &&
                 !responseData.details.includes('at ') &&
                 responseData.details.length < 500) {
                 return responseData.details;
+            }
+        }
+        
+        // Alternative: check for message field
+        if (responseData.message && typeof responseData.message === 'string') {
+            if (!responseData.message.includes('Internal') && 
+                !responseData.message.includes('Stack') &&
+                !responseData.message.includes('at ') &&
+                responseData.message.length < 500) {
+                return responseData.message;
             }
         }
     }
@@ -153,7 +209,7 @@ export const reportsApi = {
                 // For other errors, extract user-friendly message
                 return { 
                     success: false, 
-                    error: getErrorMessage(error)
+                    error: await getErrorMessage(error)
                 };
             }
             return data;
@@ -169,7 +225,7 @@ export const reportsApi = {
             // For other errors, extract user-friendly message
             return { 
                 success: false, 
-                error: getErrorMessage(err)
+                error: await getErrorMessage(err)
             };
         }
     },
@@ -249,7 +305,7 @@ export const reportsApi = {
                 // For other errors, extract user-friendly message
                 return {
                     success: false,
-                    error: getErrorMessage(error)
+                    error: await getErrorMessage(error)
                 };
             }
 
@@ -265,7 +321,7 @@ export const reportsApi = {
             // For other errors, extract user-friendly message
             return { 
                 success: false, 
-                error: getErrorMessage(err)
+                error: await getErrorMessage(err)
             };
         }
     }
