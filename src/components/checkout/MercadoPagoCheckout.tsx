@@ -2,14 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { Box, Button, CircularProgress, Alert } from '@mui/material';
+import Image from 'next/image';
 import { reportsApi, CreateOrderRequest } from '@/api/reports';
 import { useCart } from "@/context/CartContext";
 import { useCurrency } from "@/context/CurrencyContext";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuthErrorHandler } from '@/hooks/useAuthErrorHandler';
-// We need to import the logo. For now, I'll use a placeholder text or try to copy the asset later.
-// import MercadoPagoLogo from '../../assets/MP_RGB_HANDSHAKE_pluma_horizontal.svg';
 
 interface MercadoPagoCheckoutProps {
     'aria-label'?: string;
@@ -106,7 +105,7 @@ const MercadoPagoCheckout = ({
     }
 
     return (
-        <Box sx={{ width, maxWidth, maxHeight: 55 }}>
+        <Box sx={{ width, maxWidth, maxHeight: 65 }}>
             <Button
                 variant="contained"
                 aria-label={ariaLabel || 'Pagar con Mercado Pago'}
@@ -123,7 +122,8 @@ const MercadoPagoCheckout = ({
                     justifyContent: 'center',
                     boxShadow: '0 2px 8px rgba(0, 173, 239, 0.10)',
                     transition: 'all 0.2s',
-                    p: 2,
+                    p: 0.5,
+                    position: 'relative',
                     '&:hover': {
                         background: '#0098CE',
                         boxShadow: '0 4px 16px rgba(0, 173, 239, 0.15)',
@@ -131,14 +131,26 @@ const MercadoPagoCheckout = ({
                     '&:disabled': {
                         background: '#B0E6FA',
                         color: '#FFFFFF',
+                        opacity: 0.6,
                     },
                 }}
             >
-                {/* Replaced Image with Text for now until asset is moved */}
-                Pagar con Mercado Pago
+                <Image
+                    src="/MP_RGB_HANDSHAKE_pluma_horizontal.png"
+                    alt="Mercado Pago"
+                    width={960}
+                    height={240}
+                    priority
+                    style={{
+                        width: 'auto',
+                        height: '47px',
+                        maxWidth: '90%',
+                        objectFit: 'contain',
+                    }}
+                />
                 {isLoading && (
-                    <Box sx={{ position: 'absolute', right: 24 }}>
-                        <CircularProgress size={30} sx={{ color: '#fff' }} />
+                    <Box sx={{ position: 'absolute', right: 16 }}>
+                        <CircularProgress size={24} sx={{ color: '#fff' }} />
                     </Box>
                 )}
             </Button>
