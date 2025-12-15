@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
-import { Box, IconButton, Typography, Paper, CircularProgress, useMediaQuery, useTheme, Button } from '@mui/material';
+import { Box, IconButton, Typography, Paper, CircularProgress, useMediaQuery, useTheme, Button, Slide } from '@mui/material';
 import { ZoomIn, ZoomOut, Close } from '@mui/icons-material';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
@@ -21,15 +21,46 @@ export default function SecurePdfViewer({ url }: SecurePdfViewerProps) {
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
     const [numPages, setNumPages] = useState<number | null>(null);
     const [scale, setScale] = useState(isMobile ? 0.6 : 1.0);
+    const [showToolbar, setShowToolbar] = useState(true);
+    const lastScrollTop = useRef(0);
+    const scrollThreshold = 10; // Minimum scroll diff to trigger action
     
     function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
         setNumPages(numPages);
     }
 
+    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const currentScrollTop = e.currentTarget.scrollTop;
+        
+        // Always show toolbar at the very top or if bouncing
+        if (currentScrollTop <= 0) {
+            setShowToolbar(true);
+            lastScrollTop.current = 0;
+            return;
+        }
+
+        const diff = Math.abs(currentScrollTop - lastScrollTop.current);
+        if (diff < scrollThreshold) return;
+
+        if (currentScrollTop > lastScrollTop.current) {
+            // Scrolling down - hide toolbar
+            if (showToolbar) {
+                setShowToolbar(false);
+            }
+        } else if (currentScrollTop < lastScrollTop.current) {
+            // Scrolling up - show toolbar
+            if (!showToolbar) {
+                setShowToolbar(true);
+            }
+        }
+        
+        lastScrollTop.current = currentScrollTop;
+    };
+
     return (
         <Box 
             sx={{ 
-                bgcolor: '#f5f5f5',
+                bgcolor: '#525659', // Adobe Reader dark background
                 height: '100vh',
                 width: '100vw',
                 position: 'fixed',
@@ -40,69 +71,80 @@ export default function SecurePdfViewer({ url }: SecurePdfViewerProps) {
                 flexDirection: 'column',
                 userSelect: 'none',
                 WebkitUserSelect: 'none',
+                overflow: 'hidden'
             }}
             onContextMenu={(e) => e.preventDefault()}
         >
-            {/* Compact Toolbar */}
-            <Paper 
-                elevation={3} 
-                sx={{ 
-                    p: 0.5, 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'space-between',
-                    bgcolor: 'white',
-                    zIndex: 10,
-                    borderRadius: 0,
-                    borderBottom: '1px solid rgba(0,0,0,0.1)',
-                    height: isMobile ? 48 : 56,
-                }}
-            >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, overflow: 'hidden' }}>
-                    <Typography variant={isMobile ? "body2" : "subtitle2"} sx={{ fontWeight: 600, ml: 1, whiteSpace: 'nowrap' }}>
-                        Visor
-                    </Typography>
-                    {numPages && (
-                        <Typography variant="caption" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' } }}>
-                            ({numPages} pág.)
+            {/* Toolbar - Fixed at top with Slide animation */}
+            <Slide appear={false} direction="down" in={showToolbar}>
+                <Paper 
+                    elevation={3} 
+                    square
+                    sx={{ 
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        p: 0.5, 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between',
+                        bgcolor: 'white',
+                        zIndex: 10,
+                        borderBottom: '1px solid rgba(0,0,0,0.1)',
+                        height: isMobile ? 48 : 56,
+                    }}
+                >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, overflow: 'hidden' }}>
+                        <Typography variant={isMobile ? "body2" : "subtitle2"} sx={{ fontWeight: 600, ml: 1, whiteSpace: 'nowrap', color: 'text.primary' }}>
+                            Visor
                         </Typography>
-                    )}
-                </Box>
+                        {numPages && (
+                            <Typography variant="caption" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' } }}>
+                                ({numPages} pág.)
+                            </Typography>
+                        )}
+                    </Box>
 
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <IconButton size="small" onClick={() => setScale(s => Math.max(0.3, s - 0.1))}>
-                        <ZoomOut fontSize="small" />
-                    </IconButton>
-                    <Typography variant="caption" sx={{ minWidth: 30, textAlign: 'center', fontSize: '0.75rem' }}>
-                        {Math.round(scale * 100)}%
-                    </Typography>
-                    <IconButton size="small" onClick={() => setScale(s => Math.min(3.0, s + 0.1))}>
-                        <ZoomIn fontSize="small" />
-                    </IconButton>
-                    
-                    <Box sx={{ width: 1, bgcolor: 'divider', height: 20, mx: 0.5 }} />
-                    
-                    <IconButton 
-                        color="error" 
-                        size="small" 
-                        onClick={() => window.history.back()}
-                    >
-                        <Close />
-                    </IconButton>
-                </Box>
-            </Paper>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <IconButton size="small" onClick={() => setScale(s => Math.max(0.3, s - 0.1))}>
+                            <ZoomOut fontSize="small" />
+                        </IconButton>
+                        <Typography variant="caption" sx={{ minWidth: 30, textAlign: 'center', fontSize: '0.75rem', color: 'text.primary' }}>
+                            {Math.round(scale * 100)}%
+                        </Typography>
+                        <IconButton size="small" onClick={() => setScale(s => Math.min(3.0, s + 0.1))}>
+                            <ZoomIn fontSize="small" />
+                        </IconButton>
+                        
+                        <Box sx={{ width: 1, bgcolor: 'divider', height: 20, mx: 0.5 }} />
+                        
+                        <IconButton 
+                            color="error" 
+                            size="small" 
+                            onClick={() => window.history.back()}
+                        >
+                            <Close />
+                        </IconButton>
+                    </Box>
+                </Paper>
+            </Slide>
 
             {/* Scrollable Content Area */}
             <Box sx={{ 
                 flexGrow: 1, 
                 overflowY: 'auto', 
                 overflowX: 'auto', // Allow horizontal scroll if zoomed in
+                width: '100%',
+                height: '100%',
                 p: { xs: 1, md: 4 },
+                pt: { xs: 7, md: 9 }, // Add padding top to account for toolbar + spacing
                 display: 'flex',
                 justifyContent: 'center',
                 alignItems: 'flex-start', 
-                backgroundColor: '#525659' // Adobe Reader dark background
-            }}>
+            }}
+            onScroll={handleScroll}
+            >
                 <Document
                     file={url}
                     onLoadSuccess={onDocumentLoadSuccess}
