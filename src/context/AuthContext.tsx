@@ -97,8 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const signOut = async () => {
         await supabase.auth.signOut();
-        // Clear cart from localStorage
-        localStorage.removeItem('cart');
+        // Cart clearing is now handled by CartContext
         router.push('/login');
     };
 

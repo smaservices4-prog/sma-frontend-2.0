@@ -17,7 +17,8 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
     const [cartItems, setCartItems] = useState<CartItem[]>([]);
-    const { user } = useAuth();
+    const [cartInitialized, setCartInitialized] = useState(false);
+    const { user, loading: authLoading } = useAuth();
 
     // Skip operations during static generation
     const isStaticGeneration = typeof window === 'undefined';
@@ -33,6 +34,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         saveCart([]);
     }, [saveCart]);
 
+    // Load cart from localStorage on client mount
     useEffect(() => {
         // Skip during static generation
         if (isStaticGeneration) return;
@@ -46,20 +48,22 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                 console.error('Failed to parse cart from local storage', e);
             }
         }
+        setCartInitialized(true);
     }, [isStaticGeneration]);
 
-    // Clear cart when user logs out (listen to user state from AuthContext)
+    // Clear cart only when user actually logs out (not during initial loading)
     useEffect(() => {
-        // Skip during static generation
-        if (isStaticGeneration) return;
+        // Skip during static generation or while still initializing
+        if (isStaticGeneration || !cartInitialized || authLoading) return;
 
+        // Only clear if we had a user before and now they're logged out
         if (!user) {
             setCartItems([]);
             if (typeof window !== 'undefined') {
                 localStorage.removeItem('cart');
             }
         }
-    }, [user, isStaticGeneration]);
+    }, [user, authLoading, cartInitialized, isStaticGeneration]);
 
     const addToCart = useCallback((report: Report) => {
         if (isInCart(report.id)) return;
