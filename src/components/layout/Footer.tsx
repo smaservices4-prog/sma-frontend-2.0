@@ -8,7 +8,7 @@ export default function Footer() {
                 <Grid container spacing={4} justifyContent="space-between">
                     <Grid size={{ xs: 12, sm: 4 }}>
                         <Typography variant="h6" color="text.primary" gutterBottom>
-                            SMA
+                            SCI
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
                             Sistema de Gestión de Reportes.
@@ -38,7 +38,7 @@ export default function Footer() {
                             Contacto
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                            soporte@sma.com
+                            soporte@sci.com
                             <br />
                             +54 11 1234 5678
                         </Typography>
@@ -48,7 +48,7 @@ export default function Footer() {
                     <Typography variant="body2" color="text.secondary" align="center">
                         {'Copyright © '}
                         <MuiLink component={Link} href="/" color="inherit">
-                            SMA
+                            SCI
                         </MuiLink>{' '}
                         {new Date().getFullYear()}
                         {'.'}

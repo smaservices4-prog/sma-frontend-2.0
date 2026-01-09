@@ -4,7 +4,7 @@ import ConditionalLayout from "@/components/layout/ConditionalLayout";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "SMA - Sistema de Gestión de Reportes",
+  title: "SCI",
   description: "Compra reportes mensuales de forma fácil y rápida.",
 };
 

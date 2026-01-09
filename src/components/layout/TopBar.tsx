@@ -82,7 +82,7 @@ export default function TopBar() {
                                 letterSpacing: '.1rem',
                             }}
                         >
-                            SMA
+                            SCI
                         </Typography>
                         <Typography
                             variant="h5"
@@ -97,7 +97,7 @@ export default function TopBar() {
                                 letterSpacing: '.1rem',
                             }}
                         >
-                            SMA
+                            SCI
                         </Typography>
                     </Link>
 
