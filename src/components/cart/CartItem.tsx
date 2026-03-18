@@ -21,12 +21,8 @@ interface CartItemProps {
 export default function CartItem({ item }: CartItemProps) {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-    const { selectedCurrency } = useCurrency();
+    const { formatReportPrice } = useCurrency();
     const { removeFromCart } = useCart();
-
-    const priceObj = item.report.prices.find((p) => p.currency === selectedCurrency) || item.report.prices[0];
-    const price = priceObj?.amount || 0;
-    const currencySymbol = selectedCurrency === 'EUR' ? '€' : '$';
 
     return (
         <Card
@@ -66,7 +62,7 @@ export default function CartItem({ item }: CartItemProps) {
                 }}
             >
                 <Typography variant="h6" sx={{ fontWeight: 700, color: 'text.primary' }}>
-                    {currencySymbol}{price}
+                    {formatReportPrice(item.report)}
                 </Typography>
 
                 <IconButton

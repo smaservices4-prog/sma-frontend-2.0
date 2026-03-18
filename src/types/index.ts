@@ -48,11 +48,9 @@ export interface CreateOrderRequest {
     cart: Array<{
         report_id: string;
         quantity: number;
-        price: number;
-        currency: string;
     }>;
     payment_provider: 'paypal' | 'mercadopago';
-    currency?: string;
+    currency: string;
 }
 
 export interface CreateOrderResponse {
