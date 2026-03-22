@@ -1,34 +1,42 @@
+import { supabase } from '@/lib/supabase';
+
 // API para formateo de precios y utilidades de moneda
 // Ya no se obtienen tasas de cambio desde el frontend, se usan las del backend.
 
-export interface ExchangeRates {
-    ARS_USD: number;  // Peso argentino a USD
-    EUR_USD: number;  // Euro a USD
-    timestamp: number;
+export interface ExchangeRate {
+    currency: string;
+    rate: number;
+    updated_at: string;
 }
 
 export interface ExchangeRateResponse {
     success: boolean;
-    rates: ExchangeRates;
+    rates?: ExchangeRate[];
     error?: string;
 }
 
 class ExchangeRateService {
-    // Valores por defecto (ya no se usan para conversión real, solo para compatibilidad de tipos si es necesario)
-    private defaultRates: ExchangeRates = {
-        ARS_USD: 1 / 1000,
-        EUR_USD: 1.1,
-        timestamp: Date.now()
-    };
-
     /**
-     * @deprecated Las tasas de cambio ahora vienen del backend en el array 'prices' de cada reporte.
+     * Obtiene las tasas de cambio actuales desde el backend.
+     * Útil para el panel de administrador para mostrar previsualizaciones de precios.
      */
-    async getExchangeRates(): Promise<ExchangeRateResponse> {
-        return {
-            success: true,
-            rates: this.defaultRates
-        };
+    async fetchExchangeRates(): Promise<ExchangeRateResponse> {
+        try {
+            const { data, error } = await supabase.functions.invoke('get-exchange-rates');
+            
+            if (error) {
+                console.error('Error fetching exchange rates:', error);
+                return { success: false, error: 'Error al obtener tasas de cambio' };
+            }
+
+            return {
+                success: true,
+                rates: data.rates
+            };
+        } catch (error) {
+            console.error('Exception fetching exchange rates:', error);
+            return { success: false, error: 'Error inesperado' };
+        }
     }
 
     /**

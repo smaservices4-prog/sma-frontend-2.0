@@ -1,10 +1,10 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { exchangeRateService, ExchangeRates } from '@/api/exchangeRates';
+import React, { createContext, useContext, useState } from 'react';
+import { exchangeRateService, ExchangeRate } from '@/api/exchangeRates';
 
 interface ExchangeRateContextType {
-    rates: ExchangeRates | null;
+    rates: ExchangeRate[] | null;
     loading: boolean;
     error: string | null;
     convertPrice: (amount: number, fromCurrency: string, toCurrency?: string) => number;
@@ -15,18 +15,14 @@ interface ExchangeRateContextType {
 const ExchangeRateContext = createContext<ExchangeRateContextType | undefined>(undefined);
 
 /**
- * @deprecated Este contexto ya no es necesario para obtener tasas de cambio.
+ * @deprecated Este contexto ya no es necesario para obtener tasas de cambio globales.
  * Se mantiene por compatibilidad temporal con componentes que usen formatPriceWithConversion.
  */
 export function ExchangeRateProvider({ children }: { children: React.ReactNode }) {
-    // Tasas fijas para evitar romper tipos, pero ya no se usan para conversión
-    const [rates] = useState<ExchangeRates>({
-        ARS_USD: 1 / 1000,
-        EUR_USD: 1.1,
-        timestamp: Date.now()
-    });
+    // Tasas vacías para evitar romper tipos, pero ya no se usan para conversión automática en el cliente
+    const [rates] = useState<ExchangeRate[]>([]);
 
-    const convertPrice = (amount: number, fromCurrency: string, toCurrency: string = 'USD') => {
+    const convertPrice = (amount: number, _fromCurrency: string, _toCurrency: string = 'USD') => {
         return amount; // El backend ahora provee precios pre-convertidos
     };
 

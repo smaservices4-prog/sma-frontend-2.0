@@ -16,11 +16,14 @@ import {
     IconButton,
     InputLabel,
     Select,
-    MenuItem
+    MenuItem,
+    Chip,
+    Stack
 } from '@mui/material';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import CloseIcon from '@mui/icons-material/Close';
 import { storageApi, UploadFileRequest } from '@/api/storage';
+import { exchangeRateService, ExchangeRate } from '@/api/exchangeRates';
 import { useAuthErrorHandler } from '@/hooks/useAuthErrorHandler';
 
 interface ReportUploadDialogProps {
@@ -29,15 +32,10 @@ interface ReportUploadDialogProps {
     onUploadSuccess: () => void;
 }
 
-interface PriceInput {
-    currency: string;
-    amount: number;
-}
-
 interface ReportMetadata {
     title: string;
     month: string;
-    prices: PriceInput[];
+    price_usd: number;
     preview_url?: string;
 }
 
@@ -60,11 +58,6 @@ interface FileEntry {
 const ACCEPTED_TYPES = ['.pdf', '.doc', '.docx', '.xls', '.xlsx'];
 const THUMBNAIL_ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_THUMBNAIL_SIZE_BYTES = 5 * 1024 * 1024;
-const DEFAULT_PRICES: PriceInput[] = [
-    { currency: 'ARS', amount: 0 },
-    { currency: 'USD', amount: 0 },
-    { currency: 'EUR', amount: 0 }
-];
 
 const getCurrentMonthValue = () => {
     const now = new Date();
@@ -75,12 +68,12 @@ const getCurrentMonthValue = () => {
 
 const buildFileId = (file: File) => `${file.name}-${file.size}-${file.lastModified}`;
 
-const buildMetadataFromFile = (file: File, pricesTemplate: PriceInput[]): ReportMetadata => {
+const buildMetadataFromFile = (file: File, defaultPriceUsd: number): ReportMetadata => {
     const nameWithoutExtension = file.name.replace(/\.[^/.]+$/, '');
     return {
         title: nameWithoutExtension,
         month: getCurrentMonthValue(),
-        prices: pricesTemplate.map(price => ({ ...price })),
+        price_usd: defaultPriceUsd,
         preview_url: ''
     };
 };
@@ -88,12 +81,7 @@ const buildMetadataFromFile = (file: File, pricesTemplate: PriceInput[]): Report
 const validateFileEntry = (entry: FileEntry): string | null => {
     if (!entry.metadata.title.trim()) return 'El título es requerido';
     if (!entry.metadata.month) return 'El mes es requerido';
-    if (!entry.metadata.prices.length) return 'Debes ingresar precios';
-    const invalidPrices = entry.metadata.prices.filter(price => price.amount <= 0);
-    if (invalidPrices.length > 0) {
-        const currencies = invalidPrices.map(p => p.currency).join(', ');
-        return `Los precios deben ser mayor a 0 para: ${currencies}`;
-    }
+    if (entry.metadata.price_usd <= 0) return 'El precio en USD debe ser mayor a 0';
 
     const extension = `.${entry.file.name.split('.').pop()?.toLowerCase()}`;
     if (!ACCEPTED_TYPES.includes(extension)) {
@@ -141,9 +129,21 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
     const [warning, setWarning] = useState<string | null>(null);
 
     const [selectedEntries, setSelectedEntries] = useState<FileEntry[]>([]);
-    const [defaultPrices, setDefaultPrices] = useState<PriceInput[]>(DEFAULT_PRICES);
+    const [defaultPriceUsd, setDefaultPriceUsd] = useState<number>(0);
+    const [exchangeRates, setExchangeRates] = useState<ExchangeRate[]>([]);
     const [isDragging, setIsDragging] = useState(false);
     const { checkError } = useAuthErrorHandler();
+
+    // Fetch exchange rates on mount
+    useEffect(() => {
+        const loadRates = async () => {
+            const resp = await exchangeRateService.fetchExchangeRates();
+            if (resp.success && resp.rates) {
+                setExchangeRates(resp.rates);
+            }
+        };
+        if (open) loadRates();
+    }, [open]);
 
     useEffect(() => {
         if (!open) {
@@ -153,7 +153,7 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
             });
             // Reset when dialog closes
             setSelectedEntries([]);
-            setDefaultPrices(DEFAULT_PRICES);
+            setDefaultPriceUsd(0);
             setError(null);
             setSuccess(null);
             setWarning(null);
@@ -189,7 +189,7 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
                 .map(file => ({
                     id: buildFileId(file),
                     file,
-                    metadata: buildMetadataFromFile(file, defaultPrices),
+                    metadata: buildMetadataFromFile(file, defaultPriceUsd),
                     status: 'pending' as UploadStatus
                 }));
             return [...prev, ...newEntries];
@@ -261,13 +261,13 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
         );
     };
 
-    const handleApplyDefaultPricesToAll = () => {
+    const handleApplyDefaultPriceToAll = () => {
         setSelectedEntries(prev =>
             prev.map(entry => ({
                 ...entry,
                 metadata: {
                     ...entry.metadata,
-                    prices: defaultPrices.map(price => ({ ...price }))
+                    price_usd: defaultPriceUsd
                 }
             }))
         );
@@ -287,7 +287,6 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
             'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
         ];
         const currentYear = new Date().getFullYear();
-        // Amplio rango (sin límites prácticos para el admin)
         const startYear = currentYear - 100;
         const endYear = currentYear + 50;
 
@@ -317,10 +316,7 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
             report_metadata: {
                 title: entry.metadata.title.trim(),
                 month: `${entry.metadata.month}-01`,
-                prices: entry.metadata.prices.map(price => ({
-                    currency: price.currency,
-                    amount: Number(price.amount)
-                }))
+                price_usd: Number(entry.metadata.price_usd)
             }
         };
     };
@@ -357,10 +353,9 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
             const thumbnailPayload = await buildThumbnailPayload(entry.reportId, entry.thumbnailFile);
             const resp = await storageApi.uploadThumbnail(thumbnailPayload);
 
-            // Check for auth errors
             if (resp && typeof resp === 'object' && 'error' in resp) {
                 checkError(resp.error);
-                return; // Exit early if auth error was handled
+                return;
             }
 
             setSelectedEntries(prev => {
@@ -424,7 +419,6 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
                 const payload = await buildUploadPayload(entry);
                 const uploadResponse = await storageApi.uploadFileWithMetadata(payload);
 
-                // Check for auth errors
                 if (uploadResponse && typeof uploadResponse === 'object' && 'error' in uploadResponse) {
                     checkError(uploadResponse.error);
                     failureCount += 1;
@@ -435,7 +429,7 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
                                 : item
                         )
                     );
-                    continue; // Skip to next entry
+                    continue;
                 }
 
                 let thumbnailWarning: string | undefined;
@@ -446,7 +440,6 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
                         const thumbnailPayload = await buildThumbnailPayload(uploadResponse.report_id, entry.thumbnailFile);
                         const thumbnailResponse = await storageApi.uploadThumbnail(thumbnailPayload);
 
-                        // Check for auth errors in thumbnail upload
                         if (thumbnailResponse && typeof thumbnailResponse === 'object' && 'error' in thumbnailResponse) {
                             checkError(thumbnailResponse.error);
                             thumbnailWarning = 'Authentication required for thumbnail upload';
@@ -501,12 +494,26 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
         } else {
             setTimeout(() => {
                 setSelectedEntries([]);
-                setDefaultPrices(DEFAULT_PRICES);
+                setDefaultPriceUsd(0);
                 onClose();
             }, 600);
         }
 
         setUploading(false);
+    };
+
+    const getPreviewPrice = (usdAmount: number, currency: string) => {
+        const rateObj = exchangeRates.find(r => r.currency === currency);
+        if (!rateObj) return null;
+        
+        const amount = usdAmount * rateObj.rate;
+        
+        if (currency === 'ARS') {
+            // Round to nearest 1000
+            return Math.round(amount / 1000) * 1000;
+        }
+        // Round to 2 decimals
+        return Math.round(amount * 100) / 100;
     };
 
     return (
@@ -623,40 +630,42 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
                             <Card sx={{ border: '1px solid rgba(255, 140, 66, 0.2)' }}>
                                 <CardContent>
                                     <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 2 }}>
-                                        Precios por defecto (aplicar a todos)
+                                        Precio por defecto (aplicar a todos)
                                     </Typography>
-                                    <Box
-                                        sx={{
-                                            display: 'grid',
-                                            gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' },
-                                            gap: 2
-                                        }}
-                                    >
-                                        {defaultPrices.map((price, idx) => (
-                                            <TextField
-                                                key={price.currency}
-                                                fullWidth
-                                                label={`Precio ${price.currency}`}
-                                                type="number"
-                                                value={price.amount || ''}
-                                                onChange={(e) => {
-                                                    const newPrices = [...defaultPrices];
-                                                    newPrices[idx] = { ...newPrices[idx], amount: Number(e.target.value) };
-                                                    setDefaultPrices(newPrices);
-                                                }}
-                                                size="small"
-                                                disabled={uploading}
-                                            />
-                                        ))}
-                                    </Box>
-                                    <Button
-                                        variant="outlined"
-                                        sx={{ mt: 2, color: '#FF8C42', borderColor: '#FF8C42' }}
-                                        onClick={handleApplyDefaultPricesToAll}
-                                        disabled={uploading || selectedEntries.length === 0}
-                                    >
-                                        Aplicar a todos
-                                    </Button>
+                                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center">
+                                        <TextField
+                                            label="Precio Base (USD)"
+                                            type="number"
+                                            value={defaultPriceUsd || ''}
+                                            onChange={(e) => setDefaultPriceUsd(Number(e.target.value))}
+                                            size="small"
+                                            disabled={uploading}
+                                            sx={{ width: { xs: '100%', sm: '200px' } }}
+                                        />
+                                        <Button
+                                            variant="outlined"
+                                            sx={{ color: '#FF8C42', borderColor: '#FF8C42' }}
+                                            onClick={handleApplyDefaultPriceToAll}
+                                            disabled={uploading || selectedEntries.length === 0}
+                                        >
+                                            Aplicar a todos
+                                        </Button>
+                                        
+                                        {defaultPriceUsd > 0 && (
+                                            <Stack direction="row" spacing={1}>
+                                                <Chip 
+                                                    label={`ARS: $${getPreviewPrice(defaultPriceUsd, 'ARS')?.toLocaleString('es-AR')}`} 
+                                                    variant="outlined" 
+                                                    size="small" 
+                                                />
+                                                <Chip 
+                                                    label={`EUR: €${getPreviewPrice(defaultPriceUsd, 'EUR')?.toLocaleString('en-US')}`} 
+                                                    variant="outlined" 
+                                                    size="small" 
+                                                />
+                                            </Stack>
+                                        )}
+                                    </Stack>
                                 </CardContent>
                             </Card>
 
@@ -735,37 +744,35 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
                                             </FormControl>
                                         </Box>
 
-                                        <Box>
-                                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#2C1810', mb: 1 }}>
-                                                Precios por moneda *
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#2C1810' }}>
+                                                Precio *
                                             </Typography>
-                                            <Box
-                                                sx={{
-                                                    display: 'grid',
-                                                    gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' },
-                                                    gap: 1
-                                                }}
-                                            >
-                                                {entry.metadata.prices.map((price, idx) => (
-                                                    <TextField
-                                                        key={price.currency}
-                                                        fullWidth
-                                                        label={`${price.currency}`}
-                                                        type="number"
-                                                        value={price.amount || ''}
-                                                        onChange={(e) => {
-                                                            const newPrice = Number(e.target.value);
-                                                            updateEntryMetadata(entry.id, meta => {
-                                                                const newPrices = [...meta.prices];
-                                                                newPrices[idx] = { ...newPrices[idx], amount: newPrice };
-                                                                return { ...meta, prices: newPrices };
-                                                            });
-                                                        }}
-                                                        size="small"
-                                                        disabled={uploading}
-                                                    />
-                                                ))}
-                                            </Box>
+                                            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center">
+                                                <TextField
+                                                    label="USD"
+                                                    type="number"
+                                                    value={entry.metadata.price_usd || ''}
+                                                    onChange={(e) => {
+                                                        const val = Number(e.target.value);
+                                                        updateEntryMetadata(entry.id, meta => ({ ...meta, price_usd: val }));
+                                                    }}
+                                                    size="small"
+                                                    disabled={uploading}
+                                                    sx={{ width: { xs: '100%', sm: '150px' } }}
+                                                />
+                                                
+                                                {entry.metadata.price_usd > 0 && (
+                                                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                                                        <Typography variant="caption" sx={{ color: '#8B6F47' }}>
+                                                            Estimado ARS: <strong>${getPreviewPrice(entry.metadata.price_usd, 'ARS')?.toLocaleString('es-AR')}</strong>
+                                                        </Typography>
+                                                        <Typography variant="caption" sx={{ color: '#8B6F47' }}>
+                                                            Estimado EUR: <strong>€${getPreviewPrice(entry.metadata.price_usd, 'EUR')?.toLocaleString('en-US')}</strong>
+                                                        </Typography>
+                                                    </Box>
+                                                )}
+                                            </Stack>
                                         </Box>
 
                                         <Box>
@@ -911,4 +918,3 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
         </Dialog>
     );
 }
-

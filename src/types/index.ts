@@ -69,7 +69,8 @@ export interface AdminFileItem {
     title: string;        // Título legible del reporte
     month: string;        // Mes del reporte (ej: "2025-01")
     file_path: string;    // Path del archivo (antes era "name")
-    prices: Array<{       // Precios por moneda
+    price_usd: number;    // Precio base en USD
+    prices: Array<{       // Precios por moneda (calculados por el backend)
         currency: string;
         amount: number;
     }>;
