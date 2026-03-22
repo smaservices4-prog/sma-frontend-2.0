@@ -1,5 +1,7 @@
 import { Box, Container, Typography, Link as MuiLink, Grid } from '@mui/material';
 import Link from 'next/link';
+import EmailIcon from '@mui/icons-material/Email';
+import LinkedInIcon from '@mui/icons-material/LinkedIn';
 
 export default function Footer() {
     return (
@@ -38,10 +40,16 @@ export default function Footer() {
                             Contacto
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                            soporte@sci.com
-                            <br />
-                            +54 11 1234 5678
+                            guillermonanni@gmail.com
                         </Typography>
+                        <Box display="flex" gap={2} mt={1}>
+                            <MuiLink href="mailto:guillermonanni@gmail.com" color="inherit">
+                                <EmailIcon />
+                            </MuiLink>
+                            <MuiLink href="https://www.linkedin.com/in/guillermo-nanni-072a6912" target="_blank" rel="noopener noreferrer" color="inherit">
+                                <LinkedInIcon />
+                            </MuiLink>
+                        </Box>
                     </Grid>
                 </Grid>
                 <Box mt={5}>
