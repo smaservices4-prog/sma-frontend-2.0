@@ -24,6 +24,7 @@ import { Report } from '@/types';
 import { storageApi } from '@/api/storage';
 import { exchangeRateService, ExchangeRate } from '@/api/exchangeRates';
 import { useAuthErrorHandler } from '@/hooks/useAuthErrorHandler';
+import { messageForStorageApiError } from '@/lib/storageUiErrors';
 
 interface ReportEditDialogProps {
     open: boolean;
@@ -75,18 +76,11 @@ export default function ReportEditDialog({ open, onClose, report, onUpdateSucces
         if (report) {
             // Parse month from report.month (YYYY-MM-DD) to YYYY-MM
             const month = report.month.substring(0, 7);
-            
-            // Try to find price_usd from report.price_usd or from prices array as fallback
-            let price_usd = (report as any).price_usd;
-            if (price_usd === undefined && report.prices) {
-                const usdPrice = report.prices.find(p => p.currency === 'USD');
-                price_usd = usdPrice ? usdPrice.amount : 0;
-            }
 
             setReportMetadata({
                 title: report.title,
                 month: month,
-                price_usd: price_usd || 0,
+                price_usd: report.price_usd ?? 0,
                 preview_url: report.preview_url || ''
             });
             setThumbnailFile(null);
@@ -231,10 +225,13 @@ export default function ReportEditDialog({ open, onClose, report, onUpdateSucces
                 preview_url: reportMetadata.preview_url
             });
 
-            // Check for auth errors
             if (updateResult && typeof updateResult === 'object' && 'error' in updateResult) {
-                checkError(updateResult.error);
-                return; // Exit early if auth error was handled
+                const uerr = updateResult.error;
+                if (checkError(uerr)) {
+                    return;
+                }
+                setError(messageForStorageApiError(uerr, false));
+                return;
             }
 
             if (thumbnailFile) {
@@ -245,8 +242,9 @@ export default function ReportEditDialog({ open, onClose, report, onUpdateSucces
 
                     // Check for auth errors in thumbnail upload
                     if (thumbnailResponse && typeof thumbnailResponse === 'object' && 'error' in thumbnailResponse) {
-                        checkError(thumbnailResponse.error);
-                        thumbWarning = 'Authentication required for thumbnail upload';
+                        const terr = thumbnailResponse.error;
+                        const authHandledThumb = checkError(terr);
+                        thumbWarning = messageForStorageApiError(terr, authHandledThumb);
                     } else if (thumbnailResponse.thumbnail_uploaded === false) {
                         thumbWarning = thumbnailResponse.thumbnail_error || 'La miniatura no se pudo subir. Podés reintentar más tarde.';
                     }

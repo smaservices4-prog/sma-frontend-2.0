@@ -2,6 +2,8 @@ export interface Report {
     id: string;
     title: string;
     month: string; // "2025-01"
+    /** Base USD from API / DB; catalog `prices` are derived (incl. discount). */
+    price_usd: number;
     prices: Array<{
         amount: number;
         currency: string; // "ARS", "USD", "EUR"

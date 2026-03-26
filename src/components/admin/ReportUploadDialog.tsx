@@ -25,6 +25,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import { storageApi, UploadFileRequest } from '@/api/storage';
 import { exchangeRateService, ExchangeRate } from '@/api/exchangeRates';
 import { useAuthErrorHandler } from '@/hooks/useAuthErrorHandler';
+import { messageForStorageApiError } from '@/lib/storageUiErrors';
 
 interface ReportUploadDialogProps {
     open: boolean;
@@ -354,7 +355,18 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
             const resp = await storageApi.uploadThumbnail(thumbnailPayload);
 
             if (resp && typeof resp === 'object' && 'error' in resp) {
-                checkError(resp.error);
+                const err = resp.error;
+                const authHandled = checkError(err);
+                const msg = messageForStorageApiError(err, authHandled);
+                setSelectedEntries(prev => {
+                    const updated = prev.map(item =>
+                        item.id === entryId
+                            ? { ...item, thumbnailUploaded: false, thumbnailUploadWarning: msg }
+                            : item
+                    );
+                    updateWarningFromEntries(updated);
+                    return updated;
+                });
                 return;
             }
 
@@ -420,12 +432,14 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
                 const uploadResponse = await storageApi.uploadFileWithMetadata(payload);
 
                 if (uploadResponse && typeof uploadResponse === 'object' && 'error' in uploadResponse) {
-                    checkError(uploadResponse.error);
+                    const err = uploadResponse.error;
+                    const authHandled = checkError(err);
                     failureCount += 1;
+                    const displayError = messageForStorageApiError(err, authHandled);
                     setSelectedEntries(prev =>
                         prev.map(item =>
                             item.id === entry.id
-                                ? { ...item, status: 'error' as UploadStatus, error: 'Authentication required' }
+                                ? { ...item, status: 'error' as UploadStatus, error: displayError }
                                 : item
                         )
                     );
@@ -441,8 +455,9 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
                         const thumbnailResponse = await storageApi.uploadThumbnail(thumbnailPayload);
 
                         if (thumbnailResponse && typeof thumbnailResponse === 'object' && 'error' in thumbnailResponse) {
-                            checkError(thumbnailResponse.error);
-                            thumbnailWarning = 'Authentication required for thumbnail upload';
+                            const terr = thumbnailResponse.error;
+                            const authHandledThumb = checkError(terr);
+                            thumbnailWarning = messageForStorageApiError(terr, authHandledThumb);
                             thumbnailUploaded = false;
                         } else if (thumbnailResponse.thumbnail_uploaded === false) {
                             thumbnailWarning = thumbnailResponse.thumbnail_error || 'La miniatura no se pudo subir. Podés reintentar más tarde.';
