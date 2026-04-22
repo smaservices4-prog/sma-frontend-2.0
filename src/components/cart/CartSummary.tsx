@@ -105,12 +105,6 @@ export default function CartSummary() {
                         <MercadoPagoCheckout onLoad={() => setMpLoaded(true)} />
                     </Stack>
                 )}
-
-                <Box sx={{ mt: 3 }}>
-                    <Alert severity="info" sx={{ fontSize: '0.875rem' }}>
-                        Al completar la compra, recibirás los reportes en tu correo electrónico.
-                    </Alert>
-                </Box>
             </CardContent>
         </Card>
     );

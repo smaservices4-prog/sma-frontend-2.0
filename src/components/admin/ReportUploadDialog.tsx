@@ -577,69 +577,42 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
                                     multiple
                                 />
 
-                                {selectedEntries.length === 1 ? (
-                                    <Box>
-                                        <UploadFileIcon sx={{ fontSize: 48, color: '#4ADE80', mb: 1 }} />
-                                        <Typography variant="h6" sx={{ color: '#2C1810', fontWeight: 'bold', mb: 1 }}>
-                                            {selectedEntries[0].file.name}
-                                        </Typography>
-                                        <Typography variant="body2" sx={{ color: '#8B6F47', mb: 2 }}>
-                                            {(selectedEntries[0].file.size / 1024 / 1024).toFixed(2)} MB
-                                        </Typography>
-                                        <Button
-                                            variant="outlined"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                fileInputRef.current?.click();
-                                            }}
-                                            disabled={uploading}
-                                            sx={{
-                                                color: '#FF8C42',
-                                                borderColor: '#FF8C42',
-                                                '&:hover': { backgroundColor: '#FF8C42', color: '#FFFFFF' }
-                                            }}
-                                        >
-                                            Cambiar archivo
-                                        </Button>
-                                    </Box>
-                                ) : (
-                                    <Box>
-                                        <UploadFileIcon sx={{
-                                            fontSize: 48,
-                                            color: isDragging ? '#4ADE80' : '#8B6F47',
-                                            mb: 1,
-                                            transition: 'color 0.3s ease'
-                                        }} />
-                                        <Typography variant="h6" sx={{ color: '#2C1810', fontWeight: 'bold', mb: 1 }}>
-                                            {isDragging ? 'Soltá los archivos aquí' : 'Arrastrá y soltá o hacé clic para seleccionar (multi)'}
-                                        </Typography>
-                                        <Typography variant="body2" sx={{ color: '#8B6F47', mb: 2 }}>
-                                            Soporta PDF, DOC, DOCX, XLS, XLSX
-                                        </Typography>
-                                        <Typography variant="body2" sx={{ color: '#4ADE80', fontWeight: 600 }}>
-                                            {selectedEntries.length > 0
-                                                ? `${selectedEntries.length} archivo(s) listos`
-                                                : 'No hay archivos seleccionados'}
-                                        </Typography>
-                                        <Button
-                                            variant="contained"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                fileInputRef.current?.click();
-                                            }}
-                                            disabled={uploading}
-                                            sx={{
-                                                backgroundColor: '#FF8C42',
-                                                color: '#FFFFFF',
-                                                borderRadius: '8px',
-                                                fontWeight: 'bold',
-                                                '&:hover': { backgroundColor: '#E67A32' }
-                                            }}
-                                        >
-                                            Seleccionar archivo
-                                        </Button>
-                                    </Box>
-                                )}
+                                <Box>
+                                    <UploadFileIcon sx={{
+                                        fontSize: 48,
+                                        color: isDragging ? '#4ADE80' : '#8B6F47',
+                                        mb: 1,
+                                        transition: 'color 0.3s ease'
+                                    }} />
+                                    <Typography variant="h6" sx={{ color: '#2C1810', fontWeight: 'bold', mb: 1 }}>
+                                        {isDragging ? 'Soltá los archivos aquí' : 'Arrastrá y soltá o hacé clic para seleccionar'}
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ color: '#8B6F47', mb: 2 }}>
+                                        Soporta PDF, DOC, DOCX, XLS, XLSX
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ color: '#4ADE80', fontWeight: 600, mb: 2 }}>
+                                        {selectedEntries.length > 0
+                                            ? `${selectedEntries.length} archivo(s) listos`
+                                            : 'No hay archivos seleccionados'}
+                                    </Typography>
+                                    <Button
+                                        variant="contained"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            fileInputRef.current?.click();
+                                        }}
+                                        disabled={uploading}
+                                        sx={{
+                                            backgroundColor: '#FF8C42',
+                                            color: '#FFFFFF',
+                                            borderRadius: '8px',
+                                            fontWeight: 'bold',
+                                            '&:hover': { backgroundColor: '#E67A32' }
+                                        }}
+                                    >
+                                        {selectedEntries.length > 0 ? 'Agregar más archivos' : 'Seleccionar archivos'}
+                                    </Button>
+                                </Box>
                             </CardContent>
                         </Card>
                     </Box>
