@@ -26,6 +26,13 @@ import { storageApi, UploadFileRequest } from '@/api/storage';
 import { exchangeRateService, ExchangeRate } from '@/api/exchangeRates';
 import { useAuthErrorHandler } from '@/hooks/useAuthErrorHandler';
 import { messageForStorageApiError } from '@/lib/storageUiErrors';
+import {
+    buildReportMonth,
+    getCurrentReportMonthValue,
+    getMonthOptions,
+    getYearOptions,
+    parseReportMonth
+} from '@/lib/reportDate';
 
 interface ReportUploadDialogProps {
     open: boolean;
@@ -60,20 +67,13 @@ const ACCEPTED_TYPES = ['.pdf', '.doc', '.docx', '.xls', '.xlsx'];
 const THUMBNAIL_ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_THUMBNAIL_SIZE_BYTES = 5 * 1024 * 1024;
 
-const getCurrentMonthValue = () => {
-    const now = new Date();
-    const y = now.getFullYear();
-    const m = `${now.getMonth() + 1}`.padStart(2, '0');
-    return `${y}-${m}`;
-};
-
 const buildFileId = (file: File) => `${file.name}-${file.size}-${file.lastModified}`;
 
 const buildMetadataFromFile = (file: File, defaultPriceUsd: number): ReportMetadata => {
     const nameWithoutExtension = file.name.replace(/\.[^/.]+$/, '');
     return {
         title: nameWithoutExtension,
-        month: getCurrentMonthValue(),
+        month: getCurrentReportMonthValue(),
         price_usd: defaultPriceUsd,
         preview_url: ''
     };
@@ -281,24 +281,28 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
         setWarning(hasWarning ? 'Algunas miniaturas no se subieron. Podés reintentar la carga de miniatura.' : null);
     };
 
-    const generateMonthOptions = () => {
-        const months = [];
-        const monthNames = [
-            'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-            'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-        ];
-        const currentYear = new Date().getFullYear();
-        const startYear = currentYear - 100;
-        const endYear = currentYear + 50;
+    const monthOptions = getMonthOptions();
+    const currentYear = new Date().getFullYear();
+    const yearOptions = getYearOptions(currentYear - 100, currentYear + 50);
 
-        for (let year = startYear; year <= endYear; year++) {
-            for (let month = 0; month < 12; month++) {
-                const monthValue = `${year}-${(month + 1).toString().padStart(2, '0')}`;
-                const monthLabel = `${monthNames[month]} ${year}`;
-                months.push({ value: monthValue, label: monthLabel });
-            }
-        }
-        return months;
+    const updateEntryReportMonthYear = (id: string, year: string) => {
+        updateEntryMetadata(id, (meta) => {
+            const monthParts = parseReportMonth(meta.month);
+            return {
+                ...meta,
+                month: buildReportMonth(year, monthParts.month)
+            };
+        });
+    };
+
+    const updateEntryReportMonthNumber = (id: string, month: string) => {
+        updateEntryMetadata(id, (meta) => {
+            const monthParts = parseReportMonth(meta.month);
+            return {
+                ...meta,
+                month: buildReportMonth(monthParts.year, month)
+            };
+        });
     };
 
     const buildUploadPayload = async (entry: FileEntry): Promise<UploadFileRequest> => {
@@ -726,37 +730,52 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
                                                 disabled={uploading}
                                                 required
                                             />
-                                            <FormControl
-                                                fullWidth
-                                                required
-                                                sx={{ minWidth: 220 }}
-                                            >
-                                                <InputLabel>Mes del reporte</InputLabel>
-                                                <Select
-                                                    value={entry.metadata.month}
-                                                    label="Mes del reporte"
-                                                    onChange={(e) =>
-                                                        updateEntryMetadata(entry.id, meta => ({
-                                                            ...meta,
-                                                            month: e.target.value
-                                                        }))
-                                                    }
-                                                    disabled={uploading}
-                                                    MenuProps={{
-                                                        PaperProps: { sx: { maxHeight: 320 } }
-                                                    }}
-                                                    sx={{
-                                                        height: 48,
-                                                        '& .MuiSelect-select': { display: 'flex', alignItems: 'center' }
-                                                    }}
-                                                >
-                                                    {generateMonthOptions().map(option => (
-                                                        <MenuItem key={option.value} value={option.value}>
-                                                            {option.label}
-                                                        </MenuItem>
-                                                    ))}
-                                                </Select>
-                                            </FormControl>
+                                            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                                                <FormControl fullWidth required>
+                                                    <InputLabel>Año del reporte</InputLabel>
+                                                    <Select
+                                                        value={parseReportMonth(entry.metadata.month).year}
+                                                        label="Año del reporte"
+                                                        onChange={(e) => updateEntryReportMonthYear(entry.id, e.target.value)}
+                                                        disabled={uploading}
+                                                        MenuProps={{
+                                                            PaperProps: { sx: { maxHeight: 320 } }
+                                                        }}
+                                                        sx={{
+                                                            height: 48,
+                                                            '& .MuiSelect-select': { display: 'flex', alignItems: 'center' }
+                                                        }}
+                                                    >
+                                                        {yearOptions.map((option) => (
+                                                            <MenuItem key={option.value} value={option.value}>
+                                                                {option.label}
+                                                            </MenuItem>
+                                                        ))}
+                                                    </Select>
+                                                </FormControl>
+                                                <FormControl fullWidth required>
+                                                    <InputLabel>Mes del reporte</InputLabel>
+                                                    <Select
+                                                        value={parseReportMonth(entry.metadata.month).month}
+                                                        label="Mes del reporte"
+                                                        onChange={(e) => updateEntryReportMonthNumber(entry.id, e.target.value)}
+                                                        disabled={uploading}
+                                                        MenuProps={{
+                                                            PaperProps: { sx: { maxHeight: 320 } }
+                                                        }}
+                                                        sx={{
+                                                            height: 48,
+                                                            '& .MuiSelect-select': { display: 'flex', alignItems: 'center' }
+                                                        }}
+                                                    >
+                                                        {monthOptions.map((option) => (
+                                                            <MenuItem key={option.value} value={option.value}>
+                                                                {option.label}
+                                                            </MenuItem>
+                                                        ))}
+                                                    </Select>
+                                                </FormControl>
+                                            </Box>
                                         </Box>
 
                                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>

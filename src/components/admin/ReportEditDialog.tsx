@@ -25,6 +25,7 @@ import { storageApi } from '@/api/storage';
 import { exchangeRateService, ExchangeRate } from '@/api/exchangeRates';
 import { useAuthErrorHandler } from '@/hooks/useAuthErrorHandler';
 import { messageForStorageApiError } from '@/lib/storageUiErrors';
+import { buildReportMonth, getMonthOptions, getYearOptions, parseReportMonth } from '@/lib/reportDate';
 
 interface ReportEditDialogProps {
     open: boolean;
@@ -269,22 +270,28 @@ export default function ReportEditDialog({ open, onClose, report, onUpdateSucces
         }
     };
     
-    const generateMonthOptions = () => {
-        const months = [];
-        const currentYear = new Date().getFullYear();
-        // Allow editing past reports too
-        for (let year = currentYear - 2; year <= currentYear + 2; year++) {
-            for (let month = 0; month < 12; month++) {
-                 const monthValue = `${year}-${(month + 1).toString().padStart(2, '0')}`;
-                const monthNames = [
-                    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-                    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-                ];
-                const monthLabel = `${monthNames[month]} ${year}`;
-                months.push({ value: monthValue, label: monthLabel });
-            }
-        }
-        return months;
+    const monthOptions = getMonthOptions();
+    const currentYear = new Date().getFullYear();
+    const yearOptions = getYearOptions(currentYear - 2, currentYear + 2);
+
+    const updateReportYear = (year: string) => {
+        setReportMetadata((prev) => {
+            const monthParts = parseReportMonth(prev.month);
+            return {
+                ...prev,
+                month: buildReportMonth(year, monthParts.month)
+            };
+        });
+    };
+
+    const updateReportMonth = (month: string) => {
+        setReportMetadata((prev) => {
+            const monthParts = parseReportMonth(prev.month);
+            return {
+                ...prev,
+                month: buildReportMonth(monthParts.year, month)
+            };
+        });
     };
 
     const getPreviewPrice = (usdAmount: number, currency: string) => {
@@ -331,28 +338,52 @@ export default function ReportEditDialog({ open, onClose, report, onUpdateSucces
                                     required
                                 />
 
-                                <FormControl fullWidth required>
-                                    <InputLabel>Mes del reporte</InputLabel>
-                                    <Select
-                                        value={reportMetadata.month}
-                                        label="Mes del reporte"
-                                        onChange={(e) => setReportMetadata(prev => ({ ...prev, month: e.target.value }))}
-                                        disabled={uploading}
-                                        MenuProps={{
-                                            PaperProps: { sx: { maxHeight: 320 } }
-                                        }}
-                                        sx={{
-                                            height: 48,
-                                            '& .MuiSelect-select': { display: 'flex', alignItems: 'center' }
-                                        }}
-                                    >
-                                        {generateMonthOptions().map((option) => (
-                                            <MenuItem key={option.value} value={option.value}>
-                                                {option.label}
-                                            </MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
+                                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                                    <FormControl fullWidth required>
+                                        <InputLabel>Año del reporte</InputLabel>
+                                        <Select
+                                            value={parseReportMonth(reportMetadata.month).year}
+                                            label="Año del reporte"
+                                            onChange={(e) => updateReportYear(e.target.value)}
+                                            disabled={uploading}
+                                            MenuProps={{
+                                                PaperProps: { sx: { maxHeight: 320 } }
+                                            }}
+                                            sx={{
+                                                height: 48,
+                                                '& .MuiSelect-select': { display: 'flex', alignItems: 'center' }
+                                            }}
+                                        >
+                                            {yearOptions.map((option) => (
+                                                <MenuItem key={option.value} value={option.value}>
+                                                    {option.label}
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+                                    <FormControl fullWidth required>
+                                        <InputLabel>Mes del reporte</InputLabel>
+                                        <Select
+                                            value={parseReportMonth(reportMetadata.month).month}
+                                            label="Mes del reporte"
+                                            onChange={(e) => updateReportMonth(e.target.value)}
+                                            disabled={uploading}
+                                            MenuProps={{
+                                                PaperProps: { sx: { maxHeight: 320 } }
+                                            }}
+                                            sx={{
+                                                height: 48,
+                                                '& .MuiSelect-select': { display: 'flex', alignItems: 'center' }
+                                            }}
+                                        >
+                                            {monthOptions.map((option) => (
+                                                <MenuItem key={option.value} value={option.value}>
+                                                    {option.label}
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+                                </Box>
                             </Box>
 
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
