@@ -15,6 +15,7 @@ import AccessLayout, { useAuthFormWidth, useEmailValidation, commonTextFieldStyl
 import GoogleSignInButton from '@/components/auth/providers/GoogleSignInButton';
 // import FacebookSignInButton from '@/components/auth/providers/FacebookSignInButton'; // Kept for future use
 import { supabase } from '@/lib/supabase';
+import { translateAuthError } from '@/lib/auth/translateAuthError';
 import PasswordRequirements from '@/components/auth/PasswordRequirements';
 
 const HiddenMainButton = ({ buttonRef }: { buttonRef: React.Ref<HTMLButtonElement> }) => (
@@ -106,7 +107,12 @@ function RegisterContent() {
             });
 
             if (signUpError) {
-                setError(signUpError.message);
+                setError(
+                    translateAuthError(
+                        signUpError,
+                        'Ocurrió un error inesperado durante el registro.',
+                    ),
+                );
             } else if (data.user && data.user.identities?.length === 0) {
                 setError('Este correo electrónico ya está registrado pero no confirmado. Revisa tu bandeja de entrada para confirmar o intenta iniciar sesión.');
             } else if (data.user) {
@@ -118,8 +124,8 @@ function RegisterContent() {
             } else {
                 setError('Ocurrió un error inesperado durante el registro.');
             }
-        } catch (err: any) {
-            setError(err.message || 'Ocurrió un error inesperado.');
+        } catch (err: unknown) {
+            setError(translateAuthError(err, 'Ocurrió un error inesperado.'));
         } finally {
             setLoading(false);
         }

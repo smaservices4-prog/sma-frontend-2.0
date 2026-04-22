@@ -8,6 +8,7 @@ import Link from 'next/link';
 import LockResetIcon from '@mui/icons-material/LockReset';
 import AccessLayout, { useEmailValidation, commonTextFieldStyles, commonButtonStyles } from '@/components/auth/AccessLayout';
 import { useAuth } from '@/context/AuthContext';
+import { translateAuthError } from '@/lib/auth/translateAuthError';
 
 export default function ForgotPasswordPage() {
     const { resetPassword } = useAuth();
@@ -37,8 +38,10 @@ export default function ForgotPasswordPage() {
             }
 
             setSuccess(true);
-        } catch (err: any) {
-            setError(err.message || 'Error al enviar el correo de recuperación.');
+        } catch (err: unknown) {
+            setError(
+                translateAuthError(err, 'Error al enviar el correo de recuperación.'),
+            );
         } finally {
             setLoading(false);
         }

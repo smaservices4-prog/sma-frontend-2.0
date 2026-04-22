@@ -22,6 +22,7 @@ import {
     hasImplicitRecoveryTokensInHash,
     hasImplicitRecoveryTokensInSearch,
 } from '@/lib/auth/resetPasswordUrl';
+import { translateAuthError } from '@/lib/auth/translateAuthError';
 
 const IMPLICIT_RECOVERY_POLL_MS = 250;
 const IMPLICIT_RECOVERY_MAX_ATTEMPTS = 24;
@@ -105,7 +106,7 @@ export default function ResetPasswordPage() {
                     const message =
                         exchangeError.message.includes('code verifier') || exchangeError.message.includes('code_verifier')
                             ? 'Abrí el enlace en el mismo navegador donde solicitaste el correo, o solicitá un enlace nuevo.'
-                            : exchangeError.message;
+                            : translateAuthError(exchangeError);
                     finishInvalid(message);
                     return;
                 }
@@ -202,8 +203,7 @@ export default function ResetPasswordPage() {
             }, 3000);
 
         } catch (err: unknown) {
-            const message = err instanceof Error ? err.message : 'Error al actualizar la contraseña.';
-            setError(message);
+            setError(translateAuthError(err, 'Error al actualizar la contraseña.'));
         } finally {
             setLoading(false);
         }

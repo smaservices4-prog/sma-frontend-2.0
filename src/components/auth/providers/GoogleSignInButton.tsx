@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import { translateAuthError } from '@/lib/auth/translateAuthError';
 
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 
@@ -51,8 +52,9 @@ const GoogleSignInButton = ({ maxWidth = 320, onSuccess, onError, widthReady = t
                 token: credential,
             });
             if (error) {
-                if (onErrorRef.current) onErrorRef.current('Error autenticando con Google: ' + error.message);
-                else alert('Error autenticando con Google: ' + error.message);
+                const msg = 'Error autenticando con Google: ' + translateAuthError(error);
+                if (onErrorRef.current) onErrorRef.current(msg);
+                else alert(msg);
             } else {
                 if (onSuccessRef.current) onSuccessRef.current();
                 else window.location.href = '/';
