@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     Box, Button, TextField, Typography, Alert, Avatar, CircularProgress, Link as MuiLink,
@@ -14,6 +14,23 @@ import AccessLayout, { commonTextFieldStyles, commonButtonStyles } from '@/compo
 import { supabase } from '@/lib/supabase';
 import PasswordRequirements from '@/components/auth/PasswordRequirements';
 import { useAuth } from '@/context/AuthContext';
+import {
+    clearUrlFragmentAndQueryPreservingPath,
+    exchangePkceCodeOnce,
+    getPkceCodeFromSearchParams,
+    getRecoveryErrorMessageFromUrl,
+    hasImplicitRecoveryTokensInHash,
+    hasImplicitRecoveryTokensInSearch,
+} from '@/lib/auth/resetPasswordUrl';
+
+const IMPLICIT_RECOVERY_POLL_MS = 250;
+const IMPLICIT_RECOVERY_MAX_ATTEMPTS = 24;
+
+function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+        setTimeout(resolve, ms);
+    });
+}
 
 export default function ResetPasswordPage() {
     const router = useRouter();
@@ -25,64 +42,117 @@ export default function ResetPasswordPage() {
     const [success, setSuccess] = useState(false);
     const [isValidRecovery, setIsValidRecovery] = useState(false);
     const [checkedRecovery, setCheckedRecovery] = useState(false);
+    const [linkError, setLinkError] = useState<string | null>(null);
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const bootstrapCompleteRef = useRef(false);
 
     useEffect(() => {
-        let timeoutId: NodeJS.Timeout;
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            async (event, session) => {
-                console.log('Auth event:', event, session);
-                if (event === 'PASSWORD_RECOVERY') {
-                    setIsValidRecovery(true);
-                    setCheckedRecovery(true);
-                } else if (event === 'SIGNED_IN' && session) {
-                    const currentUrl = window.location.pathname;
-                    if (currentUrl !== '/auth/reset-password') {
-                        // If signed in but not on reset password page, might be invalid flow or just logged in
-                        // But if we are here, we expect to reset password
-                    }
-                }
+        bootstrapCompleteRef.current = false;
+
+        const finishValid = () => {
+            if (bootstrapCompleteRef.current) {
+                return;
             }
-        );
+            bootstrapCompleteRef.current = true;
+            setLinkError(null);
+            setIsValidRecovery(true);
+            setCheckedRecovery(true);
+        };
 
-        // Verificar si ya estamos en un flujo de recovery (URL tiene los parámetros)
-        const currentUrl = window.location.href;
-        let hasRecoveryParams = false;
-        if (currentUrl.includes('access_token') && currentUrl.includes('type=recovery')) {
-            hasRecoveryParams = true;
-        } else if (window.location.hash) {
-            const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
-            hasRecoveryParams = hashParams.has('access_token') && hashParams.get('type') === 'recovery';
-        }
+        const finishInvalid = (message?: string | null) => {
+            if (bootstrapCompleteRef.current) {
+                return;
+            }
+            bootstrapCompleteRef.current = true;
+            setLinkError(message ?? null);
+            setIsValidRecovery(false);
+            setCheckedRecovery(true);
+        };
 
-        // Also check if we have a session (Supabase might have already handled the hash)
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            if (session) {
-                // We are logged in, potentially via recovery link
-                setIsValidRecovery(true);
-                setCheckedRecovery(true);
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+            if (event === 'PASSWORD_RECOVERY') {
+                finishValid();
+                clearUrlFragmentAndQueryPreservingPath();
             }
         });
 
-        if (hasRecoveryParams) {
-            setIsValidRecovery(true);
-            setCheckedRecovery(true);
-        }
+        const run = async () => {
+            if (typeof window === 'undefined') {
+                return;
+            }
 
-        // Si después de 1 segundo no se validó el recovery, marcar como chequeado para mostrar error
-        timeoutId = setTimeout(() => {
-            setCheckedRecovery(true);
-        }, 1000);
+            const searchParams = new URLSearchParams(window.location.search);
+            const urlErrorMessage = getRecoveryErrorMessageFromUrl(searchParams);
+            if (urlErrorMessage) {
+                finishInvalid(urlErrorMessage);
+                return;
+            }
 
-        // Cleanup
+            const pkceCode = getPkceCodeFromSearchParams(searchParams);
+            if (pkceCode) {
+                clearUrlFragmentAndQueryPreservingPath();
+                const { error: exchangeError } = await exchangePkceCodeOnce(supabase, pkceCode);
+                if (bootstrapCompleteRef.current) {
+                    return;
+                }
+                if (exchangeError) {
+                    const { data: { session } } = await supabase.auth.getSession();
+                    if (session) {
+                        finishValid();
+                        return;
+                    }
+                    const message =
+                        exchangeError.message.includes('code verifier') || exchangeError.message.includes('code_verifier')
+                            ? 'Abrí el enlace en el mismo navegador donde solicitaste el correo, o solicitá un enlace nuevo.'
+                            : exchangeError.message;
+                    finishInvalid(message);
+                    return;
+                }
+                finishValid();
+                return;
+            }
+
+            if (
+                hasImplicitRecoveryTokensInHash(window.location.hash) ||
+                hasImplicitRecoveryTokensInSearch(searchParams)
+            ) {
+                for (let attempt = 0; attempt < IMPLICIT_RECOVERY_MAX_ATTEMPTS; attempt++) {
+                    if (bootstrapCompleteRef.current) {
+                        return;
+                    }
+                    const { data: { session } } = await supabase.auth.getSession();
+                    if (session) {
+                        clearUrlFragmentAndQueryPreservingPath();
+                        finishValid();
+                        return;
+                    }
+                    await sleep(IMPLICIT_RECOVERY_POLL_MS);
+                }
+                if (!bootstrapCompleteRef.current) {
+                    finishInvalid(
+                        'No se pudo completar el enlace de recuperación. Solicitá uno nuevo o abrilo en el mismo dispositivo.'
+                    );
+                }
+                return;
+            }
+
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+                finishValid();
+                return;
+            }
+
+            finishInvalid();
+        };
+
+        void run();
+
         return () => {
             subscription.unsubscribe();
-            clearTimeout(timeoutId);
         };
-    }, [router]);
+    }, []);
 
-    // Validación de contraseña
     const validatePassword = (password: string): string | null => {
         if (password.length < 8) {
             return 'La contraseña debe tener al menos 8 caracteres.';
@@ -102,7 +172,6 @@ export default function ResetPasswordPage() {
         event.preventDefault();
         setError(null);
 
-        // Validaciones
         const passwordError = validatePassword(newPassword);
         if (passwordError) {
             setError(passwordError);
@@ -117,8 +186,6 @@ export default function ResetPasswordPage() {
         setLoading(true);
 
         try {
-            // Según la documentación de Supabase, cuando llegan a esta página después del enlace
-            // el usuario ya está autenticado y solo necesitamos usar updateUser
             const { error: updateError } = await supabase.auth.updateUser({
                 password: newPassword
             });
@@ -129,25 +196,18 @@ export default function ResetPasswordPage() {
 
             setSuccess(true);
 
-            // Cerrar sesión y redirigir al login después de 3 segundos
             setTimeout(async () => {
                 await signOut();
                 router.push('/login');
             }, 3000);
 
-        } catch (err: any) {
-            setError(err.message || 'Error al actualizar la contraseña.');
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Error al actualizar la contraseña.';
+            setError(message);
         } finally {
             setLoading(false);
         }
     };
-
-    // Si no es un flujo de recovery válido, mostrar error SOLO si ya se chequeó
-    // NOTE: In Next.js we might want to redirect or show a different component
-    if (!isValidRecovery && checkedRecovery) {
-        // For now, let's just show an error message instead of redirecting to a specific page
-        // to keep it simple within this page logic
-    }
 
     if (success) {
         return (
@@ -176,9 +236,16 @@ export default function ResetPasswordPage() {
                 Restablecer contraseña
             </Typography>
 
-            {(!isValidRecovery && checkedRecovery) ? (
+            {!checkedRecovery ? (
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 3, gap: 2 }}>
+                    <CircularProgress sx={{ color: '#FF8C42' }} />
+                    <Typography variant="body2" color="text.secondary" textAlign="center">
+                        Verificando enlace de recuperación…
+                    </Typography>
+                </Box>
+            ) : (checkedRecovery && !isValidRecovery) ? (
                 <Alert severity="error" sx={{ mt: 2, width: '100%' }}>
-                    Enlace de recuperación inválido o expirado. Por favor solicita uno nuevo.
+                    {linkError ?? 'Enlace de recuperación inválido o expirado. Por favor solicita uno nuevo.'}
                 </Alert>
             ) : (
                 <Box component="form" onSubmit={handleResetPassword} sx={{ width: '100%', maxWidth: '100%', overflow: 'hidden', boxSizing: 'border-box' }}>
@@ -239,7 +306,6 @@ export default function ResetPasswordPage() {
                         }}
                     />
                     <PasswordRequirements password={newPassword} />
-                    {/* Mensaje de error o éxito */}
                     {error && (
                         <Alert severity="error" sx={{ mt: 2, backgroundColor: 'rgba(229, 57, 53, 0.08)', color: '#B71C1C', border: '1px solid #FF8C42', fontWeight: 500, boxShadow: '0 2px 8px rgba(255, 140, 66, 0.07)', '& .MuiAlert-icon': { color: '#E53935' } }}>
                             {error}
