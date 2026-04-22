@@ -1,10 +1,10 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { exchangeRateService, ExchangeRates } from '@/api/exchangeRates';
+import React, { createContext, useContext, useState } from 'react';
+import { exchangeRateService, ExchangeRate } from '@/api/exchangeRates';
 
 interface ExchangeRateContextType {
-    rates: ExchangeRates | null;
+    rates: ExchangeRate[] | null;
     loading: boolean;
     error: string | null;
     convertPrice: (amount: number, fromCurrency: string, toCurrency?: string) => number;
@@ -14,50 +14,28 @@ interface ExchangeRateContextType {
 
 const ExchangeRateContext = createContext<ExchangeRateContextType | undefined>(undefined);
 
+/**
+ * @deprecated Este contexto ya no es necesario para obtener tasas de cambio globales.
+ * Se mantiene por compatibilidad temporal con componentes que usen formatPriceWithConversion.
+ */
 export function ExchangeRateProvider({ children }: { children: React.ReactNode }) {
-    const [rates, setRates] = useState<ExchangeRates | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    // Tasas vacías para evitar romper tipos, pero ya no se usan para conversión automática en el cliente
+    const [rates] = useState<ExchangeRate[]>([]);
 
-    const fetchRates = useCallback(async (silent = false) => {
-        if (!silent) setLoading(true);
-        try {
-            const response = await exchangeRateService.getExchangeRates();
-            if (response.success) {
-                setRates(response.rates);
-                setError(null);
-            } else {
-                setError(response.error || 'Error fetching rates');
-            }
-        } catch (err) {
-            setError('Failed to fetch exchange rates');
-        } finally {
-            setLoading(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        fetchRates(false);
-
-        // Refresh rates every minute
-        const interval = setInterval(() => fetchRates(true), 60000);
-        return () => clearInterval(interval);
-    }, [fetchRates]);
-
-    const refresh = async () => {
-        await fetchRates(false);
-    };
-
-    const convertPrice = (amount: number, fromCurrency: string, toCurrency: string = 'USD') => {
-        return exchangeRateService.convertPrice(amount, fromCurrency, toCurrency);
+    const convertPrice = (amount: number, _fromCurrency: string, _toCurrency: string = 'USD') => {
+        return amount; // El backend ahora provee precios pre-convertidos
     };
 
     const formatPriceWithConversion = (amount: number, currency: string) => {
         return exchangeRateService.formatPriceWithConversion(amount, currency);
     };
 
+    const refresh = async () => {
+        // No-op
+    };
+
     return (
-        <ExchangeRateContext.Provider value={{ rates, loading, error, convertPrice, formatPriceWithConversion, refresh }}>
+        <ExchangeRateContext.Provider value={{ rates, loading: false, error: null, convertPrice, formatPriceWithConversion, refresh }}>
             {children}
         </ExchangeRateContext.Provider>
     );

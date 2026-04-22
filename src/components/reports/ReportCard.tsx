@@ -36,7 +36,7 @@ interface ReportCardProps {
 
 export default function ReportCard({ report, adminView = false, onEdit, onDelete }: ReportCardProps) {
     const theme = useTheme();
-    const { selectedCurrency } = useCurrency();
+    const { selectedCurrency, formatReportPrice } = useCurrency();
     const { addToCart, removeFromCart, isInCart } = useCart();
     const router = useRouter();
     const [isPurchasingFree, setIsPurchasingFree] = useState(false);
@@ -44,7 +44,6 @@ export default function ReportCard({ report, adminView = false, onEdit, onDelete
 
     const priceObj = report.prices.find((p) => p.currency === selectedCurrency) || report.prices[0];
     const price = priceObj?.amount || 0;
-    const currencySymbol = selectedCurrency === 'EUR' ? '€' : '$';
     const isFree = price === 0;
 
     const inCart = isInCart(report.id);
@@ -124,7 +123,7 @@ export default function ReportCard({ report, adminView = false, onEdit, onDelete
                     />
                 )}
                 {adminView && (
-                     <Chip
+                    <Chip
                         label="Admin"
                         color="warning"
                         size="small"
@@ -154,7 +153,7 @@ export default function ReportCard({ report, adminView = false, onEdit, onDelete
                     <Typography variant="h6" color="primary.main" sx={{ fontWeight: 700 }}>
                         {purchased && !adminView ? 'Leer' :
                          isFree ? 'GRATIS' :
-                         `${currencySymbol}${price}`}
+                         formatReportPrice(report)}
                     </Typography>
 
                     <Box sx={{ display: 'flex', gap: 1 }}>

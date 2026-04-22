@@ -142,10 +142,7 @@ export interface UploadFileRequest {
     report_metadata: {
         title: string;
         month: string; // YYYY-MM-DD
-        prices: {
-            currency: string;
-            amount: number;
-        }[];
+        price_usd: number;
         preview_url?: string;
     };
 }
@@ -156,10 +153,7 @@ export interface UpdateMetadataRequest {
     report_metadata: {
         title: string;
         month: string;
-        prices: {
-            currency: string;
-            amount: number;
-        }[];
+        price_usd: number;
         preview_url?: string;
     };
 }

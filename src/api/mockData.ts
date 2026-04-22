@@ -5,6 +5,7 @@ export const mockReports: Report[] = [
         id: '1',
         title: 'Reporte Macroeconómico Enero 2025',
         month: '2025-01-01',
+        price_usd: 50,
         prices: [
             { currency: 'USD', amount: 50 },
             { currency: 'ARS', amount: 50000 },
@@ -21,6 +22,7 @@ export const mockReports: Report[] = [
         id: '2',
         title: 'Reporte Sectorial Febrero 2025',
         month: '2025-02-01',
+        price_usd: 55,
         prices: [
             { currency: 'USD', amount: 55 },
             { currency: 'ARS', amount: 55000 },
@@ -37,6 +39,7 @@ export const mockReports: Report[] = [
         id: '3',
         title: 'Análisis de Mercado Marzo 2025',
         month: '2025-03-01',
+        price_usd: 60,
         prices: [
             { currency: 'USD', amount: 60 },
             { currency: 'ARS', amount: 60000 },
@@ -53,6 +56,7 @@ export const mockReports: Report[] = [
         id: '4',
         title: 'Proyecciones Q2 2025',
         month: '2025-04-01',
+        price_usd: 75,
         prices: [
             { currency: 'USD', amount: 75 },
             { currency: 'ARS', amount: 75000 },

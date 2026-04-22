@@ -2,6 +2,8 @@ export interface Report {
     id: string;
     title: string;
     month: string; // "2025-01"
+    /** Base USD from API / DB; catalog `prices` are derived (incl. discount). */
+    price_usd: number;
     prices: Array<{
         amount: number;
         currency: string; // "ARS", "USD", "EUR"
@@ -48,11 +50,9 @@ export interface CreateOrderRequest {
     cart: Array<{
         report_id: string;
         quantity: number;
-        price: number;
-        currency: string;
     }>;
     payment_provider: 'paypal' | 'mercadopago';
-    currency?: string;
+    currency: string;
 }
 
 export interface CreateOrderResponse {
@@ -71,7 +71,8 @@ export interface AdminFileItem {
     title: string;        // Título legible del reporte
     month: string;        // Mes del reporte (ej: "2025-01")
     file_path: string;    // Path del archivo (antes era "name")
-    prices: Array<{       // Precios por moneda
+    price_usd: number;    // Precio base en USD
+    prices: Array<{       // Precios por moneda (calculados por el backend)
         currency: string;
         amount: number;
     }>;

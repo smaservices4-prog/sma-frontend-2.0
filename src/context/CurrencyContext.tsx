@@ -12,7 +12,8 @@ interface CurrencyContextType {
     selectedCurrency: Currency;
     setSelectedCurrency: (currency: Currency) => void;
     loading: boolean;
-    formatPrice: (amount: number) => string;
+    formatPrice: (amount: number, currency?: Currency) => string;
+    formatReportPrice: (report: any) => string;
 }
 
 const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined);
@@ -96,12 +97,18 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
-    const formatPrice = (amount: number) => {
-        return formatPriceWithConversion(amount, selectedCurrency);
+    const formatPrice = (amount: number, currency?: Currency) => {
+        return formatPriceWithConversion(amount, currency || selectedCurrency);
+    };
+
+    const formatReportPrice = (report: any) => {
+        if (!report?.prices) return formatPrice(0);
+        const priceObj = report.prices.find((p: any) => p.currency === selectedCurrency) || report.prices[0];
+        return formatPrice(priceObj?.amount || 0);
     };
 
     return (
-        <CurrencyContext.Provider value={{ selectedCurrency, setSelectedCurrency, loading, formatPrice }}>
+        <CurrencyContext.Provider value={{ selectedCurrency, setSelectedCurrency, loading, formatPrice, formatReportPrice }}>
             {children}
         </CurrencyContext.Provider>
     );

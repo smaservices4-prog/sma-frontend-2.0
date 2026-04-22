@@ -327,14 +327,19 @@ export const reportsApi = {
     }
 };
 
-// Helper to transform DB report to Frontend Report type
+// Helper to transform API report to Frontend Report type
 function transformReport(dbReport: any): Report {
-    // Default to USD if available, otherwise first available currency
-    const defaultPrice = dbReport.prices?.find((p: any) => p.currency === 'USD') || dbReport.prices?.[0] || { amount: 0, currency: 'USD' };
+    const hasBaseUsd =
+        typeof dbReport.price_usd === 'number' && Number.isFinite(dbReport.price_usd);
+    const defaultPrice =
+        dbReport.prices?.find((p: any) => p.currency === 'USD') ||
+        dbReport.prices?.[0] ||
+        { amount: 0, currency: 'USD' };
 
     return {
         ...dbReport,
-        price: defaultPrice.amount,
-        currency: defaultPrice.currency
+        price_usd: hasBaseUsd ? dbReport.price_usd : (defaultPrice.amount ?? 0),
+        price: hasBaseUsd ? dbReport.price_usd : defaultPrice.amount,
+        currency: hasBaseUsd ? 'USD' : defaultPrice.currency
     };
 }

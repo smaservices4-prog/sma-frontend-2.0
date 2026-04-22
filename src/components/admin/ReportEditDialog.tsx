@@ -16,12 +16,15 @@ import {
     MenuItem,
     IconButton,
     Card,
-    CardContent
+    CardContent,
+    Stack
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { Report } from '@/types';
 import { storageApi } from '@/api/storage';
+import { exchangeRateService, ExchangeRate } from '@/api/exchangeRates';
 import { useAuthErrorHandler } from '@/hooks/useAuthErrorHandler';
+import { messageForStorageApiError } from '@/lib/storageUiErrors';
 
 interface ReportEditDialogProps {
     open: boolean;
@@ -33,10 +36,7 @@ interface ReportEditDialogProps {
 interface ReportMetadata {
     title: string;
     month: string;
-    prices: Array<{
-        currency: string;
-        amount: number;
-    }>;
+    price_usd: number;
     preview_url?: string;
 }
 
@@ -51,31 +51,36 @@ export default function ReportEditDialog({ open, onClose, report, onUpdateSucces
     const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
     const [thumbnailError, setThumbnailError] = useState<string | null>(null);
     const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+    const [exchangeRates, setExchangeRates] = useState<ExchangeRate[]>([]);
     const { checkError } = useAuthErrorHandler();
 
     const [reportMetadata, setReportMetadata] = useState<ReportMetadata>({
         title: '',
         month: '',
-        prices: [
-            { currency: 'ARS', amount: 0 },
-            { currency: 'USD', amount: 0 },
-            { currency: 'EUR', amount: 0 }
-        ],
+        price_usd: 0,
         preview_url: ''
     });
+
+    // Fetch exchange rates on mount
+    useEffect(() => {
+        const loadRates = async () => {
+            const resp = await exchangeRateService.fetchExchangeRates();
+            if (resp.success && resp.rates) {
+                setExchangeRates(resp.rates);
+            }
+        };
+        if (open) loadRates();
+    }, [open]);
 
     useEffect(() => {
         if (report) {
             // Parse month from report.month (YYYY-MM-DD) to YYYY-MM
             const month = report.month.substring(0, 7);
+
             setReportMetadata({
                 title: report.title,
                 month: month,
-                prices: report.prices || [
-                     { currency: 'ARS', amount: 0 },
-                     { currency: 'USD', amount: 0 },
-                     { currency: 'EUR', amount: 0 }
-                ],
+                price_usd: report.price_usd ?? 0,
                 preview_url: report.preview_url || ''
             });
             setThumbnailFile(null);
@@ -191,11 +196,8 @@ export default function ReportEditDialog({ open, onClose, report, onUpdateSucces
             setError('El mes es requerido');
             return;
         }
-
-        const invalidPrices = reportMetadata.prices.filter(price => price.amount <= 0);
-        if (invalidPrices.length > 0) {
-            const currencies = invalidPrices.map(p => p.currency).join(', ');
-            setError(`Los precios deben ser mayor a 0 para: ${currencies}`);
+        if (reportMetadata.price_usd <= 0) {
+            setError('El precio en USD debe ser mayor a 0');
             return;
         }
         if (thumbnailError) {
@@ -214,20 +216,22 @@ export default function ReportEditDialog({ open, onClose, report, onUpdateSucces
             }
 
             // Format month for backend (YYYY-MM-DD)
-            // We append -01 to match the storage format
             const formattedMonth = `${reportMetadata.month}-01`;
 
             const updateResult = await storageApi.updateMetadata(report.id, {
                 title: reportMetadata.title,
                 month: formattedMonth,
-                prices: reportMetadata.prices,
+                price_usd: Number(reportMetadata.price_usd),
                 preview_url: reportMetadata.preview_url
             });
 
-            // Check for auth errors
             if (updateResult && typeof updateResult === 'object' && 'error' in updateResult) {
-                checkError(updateResult.error);
-                return; // Exit early if auth error was handled
+                const uerr = updateResult.error;
+                if (checkError(uerr)) {
+                    return;
+                }
+                setError(messageForStorageApiError(uerr, false));
+                return;
             }
 
             if (thumbnailFile) {
@@ -238,8 +242,9 @@ export default function ReportEditDialog({ open, onClose, report, onUpdateSucces
 
                     // Check for auth errors in thumbnail upload
                     if (thumbnailResponse && typeof thumbnailResponse === 'object' && 'error' in thumbnailResponse) {
-                        checkError(thumbnailResponse.error);
-                        thumbWarning = 'Authentication required for thumbnail upload';
+                        const terr = thumbnailResponse.error;
+                        const authHandledThumb = checkError(terr);
+                        thumbWarning = messageForStorageApiError(terr, authHandledThumb);
                     } else if (thumbnailResponse.thumbnail_uploaded === false) {
                         thumbWarning = thumbnailResponse.thumbnail_error || 'La miniatura no se pudo subir. Podés reintentar más tarde.';
                     }
@@ -280,6 +285,20 @@ export default function ReportEditDialog({ open, onClose, report, onUpdateSucces
             }
         }
         return months;
+    };
+
+    const getPreviewPrice = (usdAmount: number, currency: string) => {
+        const rateObj = exchangeRates.find(r => r.currency === currency);
+        if (!rateObj) return null;
+        
+        const amount = usdAmount * rateObj.rate;
+        
+        if (currency === 'ARS') {
+            // Round to nearest 1000
+            return Math.round(amount / 1000) * 1000;
+        }
+        // Round to 2 decimals
+        return Math.round(amount * 100) / 100;
     };
 
     return (
@@ -336,38 +355,36 @@ export default function ReportEditDialog({ open, onClose, report, onUpdateSucces
                                 </FormControl>
                             </Box>
 
-                            <Box>
-                                <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#2C1810', mb: 1 }}>
-                                    Precios por moneda *
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#2C1810' }}>
+                                    Precio *
                                 </Typography>
-                                <Box
-                                    sx={{
-                                        display: 'grid',
-                                        gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' },
-                                        gap: 1
-                                    }}
-                                >
-                                    {reportMetadata.prices.map((price, index) => (
-                                        <TextField
-                                            key={price.currency}
-                                            fullWidth
-                                            label={price.currency}
-                                            type="number"
-                                            value={price.amount || ''}
-                                            onChange={(e) => {
-                                                const newPrices = [...reportMetadata.prices];
-                                                newPrices[index] = {
-                                                    ...newPrices[index],
-                                                    amount: Number(e.target.value)
-                                                };
-                                                setReportMetadata(prev => ({ ...prev, prices: newPrices }));
-                                            }}
-                                            disabled={uploading}
-                                            required
-                                            size="small"
-                                        />
-                                    ))}
-                                </Box>
+                                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center">
+                                    <TextField
+                                        label="USD"
+                                        type="number"
+                                        value={reportMetadata.price_usd || ''}
+                                        onChange={(e) => {
+                                            const val = Number(e.target.value);
+                                            setReportMetadata(prev => ({ ...prev, price_usd: val }));
+                                        }}
+                                        disabled={uploading}
+                                        required
+                                        size="small"
+                                        sx={{ width: { xs: '100%', sm: '150px' } }}
+                                    />
+                                    
+                                    {reportMetadata.price_usd > 0 && (
+                                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                                            <Typography variant="caption" sx={{ color: '#8B6F47' }}>
+                                                Estimado ARS: <strong>${getPreviewPrice(reportMetadata.price_usd, 'ARS')?.toLocaleString('es-AR')}</strong>
+                                            </Typography>
+                                            <Typography variant="caption" sx={{ color: '#8B6F47' }}>
+                                                Estimado EUR: <strong>€${getPreviewPrice(reportMetadata.price_usd, 'EUR')?.toLocaleString('en-US')}</strong>
+                                            </Typography>
+                                        </Box>
+                                    )}
+                                </Stack>
                             </Box>
 
                             <Box>
@@ -478,7 +495,7 @@ export default function ReportEditDialog({ open, onClose, report, onUpdateSucces
                 <Button
                     onClick={handleUpdateReport}
                     variant="contained"
-                    disabled={uploading || !reportMetadata.title.trim() || !reportMetadata.month || reportMetadata.prices.some(p => p.amount <= 0) || !!thumbnailError}
+                    disabled={uploading || !reportMetadata.title.trim() || !reportMetadata.month || reportMetadata.price_usd <= 0 || !!thumbnailError}
                     sx={{
                         backgroundColor: '#FF8C42',
                         color: '#FFFFFF',
