@@ -305,43 +305,19 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
         });
     };
 
-    const buildUploadPayload = async (entry: FileEntry): Promise<UploadFileRequest> => {
-        const arrayBuffer = await entry.file.arrayBuffer();
-        const uint8Array = new Uint8Array(arrayBuffer);
-        const fileData = Array.from(uint8Array);
+    const buildUploadPayload = (entry: FileEntry): UploadFileRequest => ({
+        file: entry.file,
+        report_metadata: {
+            title: entry.metadata.title.trim(),
+            month: `${entry.metadata.month}-01`,
+            price_usd: Number(entry.metadata.price_usd),
+        },
+    });
 
-        return {
-            action: 'uploadFile',
-            file: {
-                name: entry.file.name,
-                size: entry.file.size,
-                type: entry.file.type
-            },
-            fileData,
-            report_metadata: {
-                title: entry.metadata.title.trim(),
-                month: `${entry.metadata.month}-01`,
-                price_usd: Number(entry.metadata.price_usd)
-            }
-        };
-    };
-
-    const buildThumbnailPayload = async (reportId: string, thumbnail: File) => {
-        const arrayBuffer = await thumbnail.arrayBuffer();
-        const uint8Array = new Uint8Array(arrayBuffer);
-        const fileData = Array.from(uint8Array);
-
-        return {
-            action: 'uploadThumbnail' as const,
-            report_id: reportId,
-            file: {
-                name: thumbnail.name,
-                size: thumbnail.size,
-                type: thumbnail.type
-            },
-            fileData
-        };
-    };
+    const buildThumbnailPayload = (reportId: string, thumbnail: File) => ({
+        report_id: reportId,
+        file: thumbnail,
+    });
 
     const retryThumbnailUpload = async (entryId: string) => {
         const entry = selectedEntries.find(e => e.id === entryId);
@@ -355,7 +331,7 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
         setSuccess(null);
 
         try {
-            const thumbnailPayload = await buildThumbnailPayload(entry.reportId, entry.thumbnailFile);
+            const thumbnailPayload = buildThumbnailPayload(entry.reportId, entry.thumbnailFile);
             const resp = await storageApi.uploadThumbnail(thumbnailPayload);
 
             if (resp && typeof resp === 'object' && 'error' in resp) {
@@ -432,7 +408,7 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
 
         for (const entry of selectedEntries) {
             try {
-                const payload = await buildUploadPayload(entry);
+                const payload = buildUploadPayload(entry);
                 const uploadResponse = await storageApi.uploadFileWithMetadata(payload);
 
                 if (uploadResponse && typeof uploadResponse === 'object' && 'error' in uploadResponse) {
@@ -455,7 +431,7 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
 
                 if (entry.thumbnailFile) {
                     try {
-                        const thumbnailPayload = await buildThumbnailPayload(uploadResponse.report_id, entry.thumbnailFile);
+                        const thumbnailPayload = buildThumbnailPayload(uploadResponse.report_id, entry.thumbnailFile);
                         const thumbnailResponse = await storageApi.uploadThumbnail(thumbnailPayload);
 
                         if (thumbnailResponse && typeof thumbnailResponse === 'object' && 'error' in thumbnailResponse) {

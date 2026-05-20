@@ -139,22 +139,10 @@ export default function ReportEditDialog({ open, onClose, report, onUpdateSucces
         setThumbnailPreview(previewUrl);
     };
 
-    const buildThumbnailPayload = async (reportId: string, thumbnail: File) => {
-        const buffer = await thumbnail.arrayBuffer();
-        const uint8Array = new Uint8Array(buffer);
-        const fileData = Array.from(uint8Array);
-
-        return {
-            action: 'uploadThumbnail' as const,
-            report_id: reportId,
-            file: {
-                name: thumbnail.name,
-                size: thumbnail.size,
-                type: thumbnail.type
-            },
-            fileData
-        };
-    };
+    const buildThumbnailPayload = (reportId: string, thumbnail: File) => ({
+        report_id: reportId,
+        file: thumbnail,
+    });
 
     const handleRetryThumbnail = async () => {
         if (!report || !thumbnailFile) {
@@ -167,7 +155,7 @@ export default function ReportEditDialog({ open, onClose, report, onUpdateSucces
         setSuccess(null);
 
         try {
-            const thumbnailPayload = await buildThumbnailPayload(report.id, thumbnailFile);
+            const thumbnailPayload = buildThumbnailPayload(report.id, thumbnailFile);
             const resp = await storageApi.uploadThumbnail(thumbnailPayload);
 
             // Check for auth errors
@@ -238,7 +226,7 @@ export default function ReportEditDialog({ open, onClose, report, onUpdateSucces
             if (thumbnailFile) {
                 let thumbWarning: string | null = null;
                 try {
-                    const thumbnailPayload = await buildThumbnailPayload(report.id, thumbnailFile);
+                    const thumbnailPayload = buildThumbnailPayload(report.id, thumbnailFile);
                     const thumbnailResponse = await storageApi.uploadThumbnail(thumbnailPayload);
 
                     // Check for auth errors in thumbnail upload
