@@ -1,13 +1,7 @@
 'use client';
 
 import { createTheme } from '@mui/material/styles';
-import { Lora } from 'next/font/google';
 
-const lora = Lora({
-    weight: ['400', '500', '600', '700'],
-    subsets: ['latin'],
-    display: 'swap',
-});
 
 const theme = createTheme({
     palette: {
@@ -48,7 +42,7 @@ const theme = createTheme({
         // For now mapping standard palette
     },
     typography: {
-        fontFamily: lora.style.fontFamily,
+        fontFamily: '"Times New Roman", Times, Georgia, serif',
         h1: {
             fontSize: '3rem', // 48px
             fontWeight: 700,

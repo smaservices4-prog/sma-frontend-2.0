@@ -1,14 +1,7 @@
 import type { Metadata } from "next";
-import { Lora } from "next/font/google";
 import Providers from "@/components/Providers";
 import ConditionalLayout from "@/components/layout/ConditionalLayout";
 import "./globals.css";
-
-const lora = Lora({
-  weight: ["400", "500", "600", "700"],
-  subsets: ["latin"],
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "SCI",
@@ -22,7 +15,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" suppressHydrationWarning={true}>
-      <body className={lora.className} suppressHydrationWarning={true}>
+      <body suppressHydrationWarning={true}>
         <Providers>
           <ConditionalLayout>
             {children}
