@@ -50,6 +50,12 @@ export const getYearOptions = (startYear: number, endYear: number): YearOption[]
     return years;
 };
 
+/** Mismo rango que en crear/editar reportes: 100 años atrás, 50 adelante. */
+export const getReportYearOptions = (): YearOption[] => {
+    const currentYear = new Date().getFullYear();
+    return getYearOptions(currentYear - 100, currentYear + 50);
+};
+
 export const parseReportMonth = (reportMonth: string): ReportMonthParts => {
     const fallback = getCurrentReportMonthValue();
     const [fallbackYear, fallbackMonth] = fallback.split('-');

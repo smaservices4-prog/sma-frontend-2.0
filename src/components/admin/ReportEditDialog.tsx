@@ -25,7 +25,7 @@ import { storageApi } from '@/api/storage';
 import { exchangeRateService, ExchangeRate } from '@/api/exchangeRates';
 import { useAuthErrorHandler } from '@/hooks/useAuthErrorHandler';
 import { messageForStorageApiError } from '@/lib/storageUiErrors';
-import { buildReportMonth, getMonthOptions, getYearOptions, parseReportMonth } from '@/lib/reportDate';
+import { buildReportMonth, getMonthOptions, getReportYearOptions, parseReportMonth } from '@/lib/reportDate';
 
 interface ReportEditDialogProps {
     open: boolean;
@@ -259,8 +259,7 @@ export default function ReportEditDialog({ open, onClose, report, onUpdateSucces
     };
     
     const monthOptions = getMonthOptions();
-    const currentYear = new Date().getFullYear();
-    const yearOptions = getYearOptions(currentYear - 2, currentYear + 2);
+    const yearOptions = getReportYearOptions();
 
     const updateReportYear = (year: string) => {
         setReportMetadata((prev) => {

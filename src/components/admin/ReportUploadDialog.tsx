@@ -30,7 +30,7 @@ import {
     buildReportMonth,
     getCurrentReportMonthValue,
     getMonthOptions,
-    getYearOptions,
+    getReportYearOptions,
     parseReportMonth
 } from '@/lib/reportDate';
 
@@ -282,8 +282,7 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
     };
 
     const monthOptions = getMonthOptions();
-    const currentYear = new Date().getFullYear();
-    const yearOptions = getYearOptions(currentYear - 100, currentYear + 50);
+    const yearOptions = getReportYearOptions();
 
     const updateEntryReportMonthYear = (id: string, year: string) => {
         updateEntryMetadata(id, (meta) => {

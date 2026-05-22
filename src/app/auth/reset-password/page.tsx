@@ -23,6 +23,7 @@ import {
     hasImplicitRecoveryTokensInSearch,
 } from '@/lib/auth/resetPasswordUrl';
 import { translateAuthError } from '@/lib/auth/translateAuthError';
+import AppLogo from '@/components/layout/AppLogo';
 
 const IMPLICIT_RECOVERY_POLL_MS = 250;
 const IMPLICIT_RECOVERY_MAX_ATTEMPTS = 24;
@@ -229,9 +230,7 @@ export default function ResetPasswordPage() {
 
     return (
         <AccessLayout>
-            <Avatar sx={{ m: 1, bgcolor: '#FF8C42' }}>
-                <Typography variant="h6" color="white">🔒</Typography>
-            </Avatar>
+            <AppLogo size="lg" href={null} sx={{ m: 1 }} />
             <Typography component="h1" variant="h5" sx={{ mb: 2, color: '#2C1810', fontWeight: 700, textAlign: 'center' }}>
                 Restablecer contraseña
             </Typography>

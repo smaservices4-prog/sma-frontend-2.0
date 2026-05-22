@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import {
     Box, Button, TextField, Typography, Alert, Link as MuiLink,
-    Avatar, CircularProgress, Divider,
+    CircularProgress, Divider,
     IconButton, InputAdornment
 } from '@mui/material';
 import Link from 'next/link';
@@ -17,6 +17,7 @@ import GoogleSignInButton from '@/components/auth/providers/GoogleSignInButton';
 import { supabase } from '@/lib/supabase';
 import { translateAuthError } from '@/lib/auth/translateAuthError';
 import PasswordRequirements from '@/components/auth/PasswordRequirements';
+import AppLogo from '@/components/layout/AppLogo';
 
 const HiddenMainButton = ({ buttonRef }: { buttonRef: React.Ref<HTMLButtonElement> }) => (
     <Button
@@ -164,9 +165,7 @@ function RegisterContent() {
 
     return (
         <AccessLayout>
-            <Avatar sx={{ mb: 1, bgcolor: '#FF8C42' }}>
-                <Typography variant="h6" color="white">UI</Typography>
-            </Avatar>
+            <AppLogo size="lg" href={null} sx={{ mb: 1 }} />
             <Typography component="h1" variant="h5" sx={{ mb: 2, color: '#2C1810' }}>
                 Crea tu cuenta
             </Typography>
