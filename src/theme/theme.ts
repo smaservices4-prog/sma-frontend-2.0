@@ -9,6 +9,7 @@ const inter = Inter({
     display: 'swap',
 });
 
+
 const theme = createTheme({
     palette: {
         primary: {

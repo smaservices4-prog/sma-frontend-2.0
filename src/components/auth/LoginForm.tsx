@@ -21,6 +21,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 import { useAuth } from '@/context/AuthContext';
+import { translateAuthError } from '@/lib/auth/translateAuthError';
 import GoogleSignInButton from '@/components/auth/providers/GoogleSignInButton';
 // import FacebookSignInButton from '@/components/auth/providers/FacebookSignInButton'; // Kept for future use
 import { useAuthFormWidth, commonTextFieldStyles, commonButtonStyles, AuthPageLoader } from '@/components/auth/AccessLayout';
@@ -107,8 +108,13 @@ export default function LoginForm() {
             // Redirect to returnTo URL if provided, otherwise go to home
             const returnTo = searchParams.get('returnTo');
             router.push(returnTo ? decodeURIComponent(returnTo) : '/');
-        } catch (err: any) {
-            setError(err.message || 'Error al iniciar sesión. Por favor intenta nuevamente.');
+        } catch (err: unknown) {
+            setError(
+                translateAuthError(
+                    err,
+                    'Error al iniciar sesión. Por favor intentá nuevamente.',
+                ),
+            );
         } finally {
             setLoading(false);
         }

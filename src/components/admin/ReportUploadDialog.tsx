@@ -26,6 +26,13 @@ import { storageApi, UploadFileRequest } from '@/api/storage';
 import { exchangeRateService, ExchangeRate } from '@/api/exchangeRates';
 import { useAuthErrorHandler } from '@/hooks/useAuthErrorHandler';
 import { messageForStorageApiError } from '@/lib/storageUiErrors';
+import {
+    buildReportMonth,
+    getCurrentReportMonthValue,
+    getMonthOptions,
+    getReportYearOptions,
+    parseReportMonth
+} from '@/lib/reportDate';
 
 interface ReportUploadDialogProps {
     open: boolean;
@@ -60,20 +67,13 @@ const ACCEPTED_TYPES = ['.pdf', '.doc', '.docx', '.xls', '.xlsx'];
 const THUMBNAIL_ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_THUMBNAIL_SIZE_BYTES = 5 * 1024 * 1024;
 
-const getCurrentMonthValue = () => {
-    const now = new Date();
-    const y = now.getFullYear();
-    const m = `${now.getMonth() + 1}`.padStart(2, '0');
-    return `${y}-${m}`;
-};
-
 const buildFileId = (file: File) => `${file.name}-${file.size}-${file.lastModified}`;
 
 const buildMetadataFromFile = (file: File, defaultPriceUsd: number): ReportMetadata => {
     const nameWithoutExtension = file.name.replace(/\.[^/.]+$/, '');
     return {
         title: nameWithoutExtension,
-        month: getCurrentMonthValue(),
+        month: getCurrentReportMonthValue(),
         price_usd: defaultPriceUsd,
         preview_url: ''
     };
@@ -281,63 +281,42 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
         setWarning(hasWarning ? 'Algunas miniaturas no se subieron. Podés reintentar la carga de miniatura.' : null);
     };
 
-    const generateMonthOptions = () => {
-        const months = [];
-        const monthNames = [
-            'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-            'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-        ];
-        const currentYear = new Date().getFullYear();
-        const startYear = currentYear - 100;
-        const endYear = currentYear + 50;
+    const monthOptions = getMonthOptions();
+    const yearOptions = getReportYearOptions();
 
-        for (let year = startYear; year <= endYear; year++) {
-            for (let month = 0; month < 12; month++) {
-                const monthValue = `${year}-${(month + 1).toString().padStart(2, '0')}`;
-                const monthLabel = `${monthNames[month]} ${year}`;
-                months.push({ value: monthValue, label: monthLabel });
-            }
-        }
-        return months;
+    const updateEntryReportMonthYear = (id: string, year: string) => {
+        updateEntryMetadata(id, (meta) => {
+            const monthParts = parseReportMonth(meta.month);
+            return {
+                ...meta,
+                month: buildReportMonth(year, monthParts.month)
+            };
+        });
     };
 
-    const buildUploadPayload = async (entry: FileEntry): Promise<UploadFileRequest> => {
-        const arrayBuffer = await entry.file.arrayBuffer();
-        const uint8Array = new Uint8Array(arrayBuffer);
-        const fileData = Array.from(uint8Array);
-
-        return {
-            action: 'uploadFile',
-            file: {
-                name: entry.file.name,
-                size: entry.file.size,
-                type: entry.file.type
-            },
-            fileData,
-            report_metadata: {
-                title: entry.metadata.title.trim(),
-                month: `${entry.metadata.month}-01`,
-                price_usd: Number(entry.metadata.price_usd)
-            }
-        };
+    const updateEntryReportMonthNumber = (id: string, month: string) => {
+        updateEntryMetadata(id, (meta) => {
+            const monthParts = parseReportMonth(meta.month);
+            return {
+                ...meta,
+                month: buildReportMonth(monthParts.year, month)
+            };
+        });
     };
 
-    const buildThumbnailPayload = async (reportId: string, thumbnail: File) => {
-        const arrayBuffer = await thumbnail.arrayBuffer();
-        const uint8Array = new Uint8Array(arrayBuffer);
-        const fileData = Array.from(uint8Array);
+    const buildUploadPayload = (entry: FileEntry): UploadFileRequest => ({
+        file: entry.file,
+        report_metadata: {
+            title: entry.metadata.title.trim(),
+            month: `${entry.metadata.month}-01`,
+            price_usd: Number(entry.metadata.price_usd),
+        },
+    });
 
-        return {
-            action: 'uploadThumbnail' as const,
-            report_id: reportId,
-            file: {
-                name: thumbnail.name,
-                size: thumbnail.size,
-                type: thumbnail.type
-            },
-            fileData
-        };
-    };
+    const buildThumbnailPayload = (reportId: string, thumbnail: File) => ({
+        report_id: reportId,
+        file: thumbnail,
+    });
 
     const retryThumbnailUpload = async (entryId: string) => {
         const entry = selectedEntries.find(e => e.id === entryId);
@@ -351,7 +330,7 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
         setSuccess(null);
 
         try {
-            const thumbnailPayload = await buildThumbnailPayload(entry.reportId, entry.thumbnailFile);
+            const thumbnailPayload = buildThumbnailPayload(entry.reportId, entry.thumbnailFile);
             const resp = await storageApi.uploadThumbnail(thumbnailPayload);
 
             if (resp && typeof resp === 'object' && 'error' in resp) {
@@ -428,7 +407,7 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
 
         for (const entry of selectedEntries) {
             try {
-                const payload = await buildUploadPayload(entry);
+                const payload = buildUploadPayload(entry);
                 const uploadResponse = await storageApi.uploadFileWithMetadata(payload);
 
                 if (uploadResponse && typeof uploadResponse === 'object' && 'error' in uploadResponse) {
@@ -451,7 +430,7 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
 
                 if (entry.thumbnailFile) {
                     try {
-                        const thumbnailPayload = await buildThumbnailPayload(uploadResponse.report_id, entry.thumbnailFile);
+                        const thumbnailPayload = buildThumbnailPayload(uploadResponse.report_id, entry.thumbnailFile);
                         const thumbnailResponse = await storageApi.uploadThumbnail(thumbnailPayload);
 
                         if (thumbnailResponse && typeof thumbnailResponse === 'object' && 'error' in thumbnailResponse) {
@@ -573,69 +552,42 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
                                     multiple
                                 />
 
-                                {selectedEntries.length === 1 ? (
-                                    <Box>
-                                        <UploadFileIcon sx={{ fontSize: 48, color: '#4ADE80', mb: 1 }} />
-                                        <Typography variant="h6" sx={{ color: '#2C1810', fontWeight: 'bold', mb: 1 }}>
-                                            {selectedEntries[0].file.name}
-                                        </Typography>
-                                        <Typography variant="body2" sx={{ color: '#8B6F47', mb: 2 }}>
-                                            {(selectedEntries[0].file.size / 1024 / 1024).toFixed(2)} MB
-                                        </Typography>
-                                        <Button
-                                            variant="outlined"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                fileInputRef.current?.click();
-                                            }}
-                                            disabled={uploading}
-                                            sx={{
-                                                color: '#FF8C42',
-                                                borderColor: '#FF8C42',
-                                                '&:hover': { backgroundColor: '#FF8C42', color: '#FFFFFF' }
-                                            }}
-                                        >
-                                            Cambiar archivo
-                                        </Button>
-                                    </Box>
-                                ) : (
-                                    <Box>
-                                        <UploadFileIcon sx={{
-                                            fontSize: 48,
-                                            color: isDragging ? '#4ADE80' : '#8B6F47',
-                                            mb: 1,
-                                            transition: 'color 0.3s ease'
-                                        }} />
-                                        <Typography variant="h6" sx={{ color: '#2C1810', fontWeight: 'bold', mb: 1 }}>
-                                            {isDragging ? 'Soltá los archivos aquí' : 'Arrastrá y soltá o hacé clic para seleccionar (multi)'}
-                                        </Typography>
-                                        <Typography variant="body2" sx={{ color: '#8B6F47', mb: 2 }}>
-                                            Soporta PDF, DOC, DOCX, XLS, XLSX
-                                        </Typography>
-                                        <Typography variant="body2" sx={{ color: '#4ADE80', fontWeight: 600 }}>
-                                            {selectedEntries.length > 0
-                                                ? `${selectedEntries.length} archivo(s) listos`
-                                                : 'No hay archivos seleccionados'}
-                                        </Typography>
-                                        <Button
-                                            variant="contained"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                fileInputRef.current?.click();
-                                            }}
-                                            disabled={uploading}
-                                            sx={{
-                                                backgroundColor: '#FF8C42',
-                                                color: '#FFFFFF',
-                                                borderRadius: '8px',
-                                                fontWeight: 'bold',
-                                                '&:hover': { backgroundColor: '#E67A32' }
-                                            }}
-                                        >
-                                            Seleccionar archivo
-                                        </Button>
-                                    </Box>
-                                )}
+                                <Box>
+                                    <UploadFileIcon sx={{
+                                        fontSize: 48,
+                                        color: isDragging ? '#4ADE80' : '#8B6F47',
+                                        mb: 1,
+                                        transition: 'color 0.3s ease'
+                                    }} />
+                                    <Typography variant="h6" sx={{ color: '#2C1810', fontWeight: 'bold', mb: 1 }}>
+                                        {isDragging ? 'Soltá los archivos aquí' : 'Arrastrá y soltá o hacé clic para seleccionar'}
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ color: '#8B6F47', mb: 2 }}>
+                                        Soporta PDF, DOC, DOCX, XLS, XLSX
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ color: '#4ADE80', fontWeight: 600, mb: 2 }}>
+                                        {selectedEntries.length > 0
+                                            ? `${selectedEntries.length} archivo(s) listos`
+                                            : 'No hay archivos seleccionados'}
+                                    </Typography>
+                                    <Button
+                                        variant="contained"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            fileInputRef.current?.click();
+                                        }}
+                                        disabled={uploading}
+                                        sx={{
+                                            backgroundColor: '#FF8C42',
+                                            color: '#FFFFFF',
+                                            borderRadius: '8px',
+                                            fontWeight: 'bold',
+                                            '&:hover': { backgroundColor: '#E67A32' }
+                                        }}
+                                    >
+                                        {selectedEntries.length > 0 ? 'Agregar más archivos' : 'Seleccionar archivos'}
+                                    </Button>
+                                </Box>
                             </CardContent>
                         </Card>
                     </Box>
@@ -726,37 +678,52 @@ export default function ReportUploadDialog({ open, onClose, onUploadSuccess }: R
                                                 disabled={uploading}
                                                 required
                                             />
-                                            <FormControl
-                                                fullWidth
-                                                required
-                                                sx={{ minWidth: 220 }}
-                                            >
-                                                <InputLabel>Mes del reporte</InputLabel>
-                                                <Select
-                                                    value={entry.metadata.month}
-                                                    label="Mes del reporte"
-                                                    onChange={(e) =>
-                                                        updateEntryMetadata(entry.id, meta => ({
-                                                            ...meta,
-                                                            month: e.target.value
-                                                        }))
-                                                    }
-                                                    disabled={uploading}
-                                                    MenuProps={{
-                                                        PaperProps: { sx: { maxHeight: 320 } }
-                                                    }}
-                                                    sx={{
-                                                        height: 48,
-                                                        '& .MuiSelect-select': { display: 'flex', alignItems: 'center' }
-                                                    }}
-                                                >
-                                                    {generateMonthOptions().map(option => (
-                                                        <MenuItem key={option.value} value={option.value}>
-                                                            {option.label}
-                                                        </MenuItem>
-                                                    ))}
-                                                </Select>
-                                            </FormControl>
+                                            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                                                <FormControl fullWidth required>
+                                                    <InputLabel>Año del reporte</InputLabel>
+                                                    <Select
+                                                        value={parseReportMonth(entry.metadata.month).year}
+                                                        label="Año del reporte"
+                                                        onChange={(e) => updateEntryReportMonthYear(entry.id, e.target.value)}
+                                                        disabled={uploading}
+                                                        MenuProps={{
+                                                            PaperProps: { sx: { maxHeight: 320 } }
+                                                        }}
+                                                        sx={{
+                                                            height: 48,
+                                                            '& .MuiSelect-select': { display: 'flex', alignItems: 'center' }
+                                                        }}
+                                                    >
+                                                        {yearOptions.map((option) => (
+                                                            <MenuItem key={option.value} value={option.value}>
+                                                                {option.label}
+                                                            </MenuItem>
+                                                        ))}
+                                                    </Select>
+                                                </FormControl>
+                                                <FormControl fullWidth required>
+                                                    <InputLabel>Mes del reporte</InputLabel>
+                                                    <Select
+                                                        value={parseReportMonth(entry.metadata.month).month}
+                                                        label="Mes del reporte"
+                                                        onChange={(e) => updateEntryReportMonthNumber(entry.id, e.target.value)}
+                                                        disabled={uploading}
+                                                        MenuProps={{
+                                                            PaperProps: { sx: { maxHeight: 320 } }
+                                                        }}
+                                                        sx={{
+                                                            height: 48,
+                                                            '& .MuiSelect-select': { display: 'flex', alignItems: 'center' }
+                                                        }}
+                                                    >
+                                                        {monthOptions.map((option) => (
+                                                            <MenuItem key={option.value} value={option.value}>
+                                                                {option.label}
+                                                            </MenuItem>
+                                                        ))}
+                                                    </Select>
+                                                </FormControl>
+                                            </Box>
                                         </Box>
 
                                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>

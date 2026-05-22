@@ -27,6 +27,7 @@ import {
     FilterList as FilterListIcon,
 } from '@mui/icons-material';
 import Link from 'next/link';
+import AppLogo from '@/components/layout/AppLogo';
 import { useCart } from '@/context/CartContext';
 import { useCurrency } from '@/context/CurrencyContext';
 import { useSearch } from '@/context/SearchContext';
@@ -68,38 +69,7 @@ export default function TopBar() {
         <AppBar position="sticky" color="default" elevation={1} sx={{ backgroundColor: 'white' }}>
             <Container maxWidth="lg">
                 <Toolbar disableGutters sx={{ height: 72, justifyContent: 'space-between' }}>
-                    {/* Logo */}
-                    <Link href="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center' }}>
-                        <Typography
-                            variant="h4"
-                            noWrap
-                            component="div"
-                            sx={{
-                                mr: 2,
-                                display: { xs: 'none', md: 'flex' },
-                                fontWeight: 700,
-                                color: 'primary.main',
-                                letterSpacing: '.1rem',
-                            }}
-                        >
-                            SCI
-                        </Typography>
-                        <Typography
-                            variant="h5"
-                            noWrap
-                            component="div"
-                            sx={{
-                                mr: 2,
-                                display: { xs: 'flex', md: 'none' },
-                                flexGrow: 1,
-                                fontWeight: 700,
-                                color: 'primary.main',
-                                letterSpacing: '.1rem',
-                            }}
-                        >
-                            SCI
-                        </Typography>
-                    </Link>
+                    <AppLogo size="nav" sx={{ mr: 2 }} />
 
                     {/* Mobile Menu Icon */}
                     <Box sx={{ flexGrow: 1, display: { xs: 'flex', md: 'none' } }}>

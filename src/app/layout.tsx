@@ -1,7 +1,14 @@
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import Providers from "@/components/Providers";
 import ConditionalLayout from "@/components/layout/ConditionalLayout";
 import "./globals.css";
+
+const inter = Inter({
+  weight: ["300", "400", "500", "600", "700"],
+  subsets: ["latin"],
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "SCI",
@@ -15,7 +22,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" suppressHydrationWarning={true}>
-      <body suppressHydrationWarning={true}>
+      <body className={inter.className} suppressHydrationWarning={true}>
         <Providers>
           <ConditionalLayout>
             {children}

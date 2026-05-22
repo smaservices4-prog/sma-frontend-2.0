@@ -2,12 +2,13 @@
 
 import { useState } from 'react';
 import {
-    Box, Button, TextField, Typography, Alert, Avatar, CircularProgress, Link as MuiLink
+    Box, Button, TextField, Typography, Alert, CircularProgress, Link as MuiLink
 } from '@mui/material';
 import Link from 'next/link';
-import LockResetIcon from '@mui/icons-material/LockReset';
 import AccessLayout, { useEmailValidation, commonTextFieldStyles, commonButtonStyles } from '@/components/auth/AccessLayout';
+import AppLogo from '@/components/layout/AppLogo';
 import { useAuth } from '@/context/AuthContext';
+import { translateAuthError } from '@/lib/auth/translateAuthError';
 
 export default function ForgotPasswordPage() {
     const { resetPassword } = useAuth();
@@ -37,8 +38,10 @@ export default function ForgotPasswordPage() {
             }
 
             setSuccess(true);
-        } catch (err: any) {
-            setError(err.message || 'Error al enviar el correo de recuperación.');
+        } catch (err: unknown) {
+            setError(
+                translateAuthError(err, 'Error al enviar el correo de recuperación.'),
+            );
         } finally {
             setLoading(false);
         }
@@ -46,9 +49,7 @@ export default function ForgotPasswordPage() {
 
     return (
         <AccessLayout>
-            <Avatar sx={{ m: 1, bgcolor: '#FF8C42' }}>
-                <LockResetIcon />
-            </Avatar>
+            <AppLogo size="lg" href={null} sx={{ m: 1 }} />
             <Typography component="h1" variant="h5" sx={{ mb: 2, color: '#2C1810', fontWeight: 700, textAlign: 'center' }}>
                 Recuperar contraseña
             </Typography>

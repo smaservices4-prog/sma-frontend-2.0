@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import {
     Box, Button, TextField, Typography, Alert, Link as MuiLink,
-    Avatar, CircularProgress, Divider,
+    CircularProgress, Divider,
     IconButton, InputAdornment
 } from '@mui/material';
 import Link from 'next/link';
@@ -15,7 +15,9 @@ import AccessLayout, { useAuthFormWidth, useEmailValidation, commonTextFieldStyl
 import GoogleSignInButton from '@/components/auth/providers/GoogleSignInButton';
 // import FacebookSignInButton from '@/components/auth/providers/FacebookSignInButton'; // Kept for future use
 import { supabase } from '@/lib/supabase';
+import { translateAuthError } from '@/lib/auth/translateAuthError';
 import PasswordRequirements from '@/components/auth/PasswordRequirements';
+import AppLogo from '@/components/layout/AppLogo';
 
 const HiddenMainButton = ({ buttonRef }: { buttonRef: React.Ref<HTMLButtonElement> }) => (
     <Button
@@ -106,7 +108,12 @@ function RegisterContent() {
             });
 
             if (signUpError) {
-                setError(signUpError.message);
+                setError(
+                    translateAuthError(
+                        signUpError,
+                        'Ocurrió un error inesperado durante el registro.',
+                    ),
+                );
             } else if (data.user && data.user.identities?.length === 0) {
                 setError('Este correo electrónico ya está registrado pero no confirmado. Revisa tu bandeja de entrada para confirmar o intenta iniciar sesión.');
             } else if (data.user) {
@@ -118,8 +125,8 @@ function RegisterContent() {
             } else {
                 setError('Ocurrió un error inesperado durante el registro.');
             }
-        } catch (err: any) {
-            setError(err.message || 'Ocurrió un error inesperado.');
+        } catch (err: unknown) {
+            setError(translateAuthError(err, 'Ocurrió un error inesperado.'));
         } finally {
             setLoading(false);
         }
@@ -158,9 +165,7 @@ function RegisterContent() {
 
     return (
         <AccessLayout>
-            <Avatar sx={{ mb: 1, bgcolor: '#FF8C42' }}>
-                <Typography variant="h6" color="white">UI</Typography>
-            </Avatar>
+            <AppLogo size="lg" href={null} sx={{ mb: 1 }} />
             <Typography component="h1" variant="h5" sx={{ mb: 2, color: '#2C1810' }}>
                 Crea tu cuenta
             </Typography>

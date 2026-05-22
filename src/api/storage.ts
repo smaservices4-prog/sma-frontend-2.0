@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { putFileToSignedUrl } from '@/lib/storageSignedUpload';
 import { AdminFileItem } from '@/types';
 
 /**
@@ -131,20 +132,16 @@ async function getErrorMessage(error: any): Promise<string> {
 }
 
 
+export interface ReportFileMetadata {
+    title: string;
+    month: string; // YYYY-MM-DD
+    price_usd: number;
+    preview_url?: string;
+}
+
 export interface UploadFileRequest {
-    action: 'uploadFile';
-    file: {
-        name: string;
-        size: number;
-        type: string;
-    };
-    fileData: number[]; // Array.from(uint8Array)
-    report_metadata: {
-        title: string;
-        month: string; // YYYY-MM-DD
-        price_usd: number;
-        preview_url?: string;
-    };
+    file: File;
+    report_metadata: ReportFileMetadata;
 }
 
 export interface UpdateMetadataRequest {
@@ -167,14 +164,8 @@ export interface UploadFileResponse {
 }
 
 export interface UploadThumbnailRequest {
-    action: 'uploadThumbnail';
     report_id: string;
-    file: {
-        name: string;
-        size: number;
-        type: string;
-    };
-    fileData: number[];
+    file: File;
 }
 
 export interface UploadThumbnailResponse {
@@ -186,49 +177,136 @@ export interface UploadThumbnailResponse {
     original_name?: string;
 }
 
+function buildFileDescriptor(file: File) {
+    return {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+    };
+}
+
 export const storageApi = {
     uploadFileWithMetadata: async (data: UploadFileRequest): Promise<UploadFileResponse | { error: string }> => {
-        const { data: responseData, error } = await supabase.functions.invoke('admin-storage', {
-            body: data
+        const { data: prepareData, error: prepareError } = await supabase.functions.invoke('admin-storage', {
+            body: {
+                action: 'prepareUploadFile',
+                file: buildFileDescriptor(data.file),
+                report_metadata: data.report_metadata,
+            },
         });
 
-        if (error) {
-            // Check for authentication errors (4xx only, not 5xx server errors)
-            if (isAuthError(error)) {
+        if (prepareError) {
+            if (isAuthError(prepareError)) {
                 return { error: 'AUTH_REQUIRED' };
             }
-            // For other errors, extract user-friendly message
-            return { error: await getErrorMessage(error) };
+            return { error: await getErrorMessage(prepareError) };
         }
 
-        // Check if backend returned an auth error
-        if (responseData && responseData.error === 'AUTH_REQUIRED') {
+        if (prepareData?.error === 'AUTH_REQUIRED') {
             return { error: 'AUTH_REQUIRED' };
         }
 
-        return responseData;
+        if (!prepareData?.success || !prepareData.signed_url || !prepareData.report_id) {
+            return { error: prepareData?.error || 'No se pudo preparar la subida del archivo' };
+        }
+
+        try {
+            await putFileToSignedUrl(prepareData.signed_url, data.file);
+        } catch (uploadError) {
+            return {
+                error: uploadError instanceof Error
+                    ? uploadError.message
+                    : 'Error al subir el archivo a storage',
+            };
+        }
+
+        const { data: completeData, error: completeError } = await supabase.functions.invoke('admin-storage', {
+            body: {
+                action: 'completeUploadFile',
+                report_id: prepareData.report_id,
+                file: buildFileDescriptor(data.file),
+            },
+        });
+
+        if (completeError) {
+            if (isAuthError(completeError)) {
+                return { error: 'AUTH_REQUIRED' };
+            }
+            return { error: await getErrorMessage(completeError) };
+        }
+
+        if (completeData?.error === 'AUTH_REQUIRED') {
+            return { error: 'AUTH_REQUIRED' };
+        }
+
+        if (!completeData?.success) {
+            return { error: completeData?.error || 'No se pudo confirmar la subida del archivo' };
+        }
+
+        return {
+            success: true,
+            file_path: completeData.file_path,
+            original_name: completeData.original_name,
+            sanitized_name: completeData.sanitized_name,
+            report_id: completeData.report_id,
+        };
     },
 
     uploadThumbnail: async (data: UploadThumbnailRequest): Promise<UploadThumbnailResponse | { error: string }> => {
-        const { data: responseData, error } = await supabase.functions.invoke('admin-storage', {
-            body: data
+        const { data: prepareData, error: prepareError } = await supabase.functions.invoke('admin-storage', {
+            body: {
+                action: 'prepareUploadThumbnail',
+                report_id: data.report_id,
+                file: buildFileDescriptor(data.file),
+            },
         });
 
-        if (error) {
-            // Check for authentication errors (4xx only, not 5xx server errors)
-            if (isAuthError(error)) {
+        if (prepareError) {
+            if (isAuthError(prepareError)) {
                 return { error: 'AUTH_REQUIRED' };
             }
-            // For other errors, extract user-friendly message
-            return { error: await getErrorMessage(error) };
+            return { error: await getErrorMessage(prepareError) };
         }
 
-        // Check if backend returned an auth error
-        if (responseData && responseData.error === 'AUTH_REQUIRED') {
+        if (prepareData?.error === 'AUTH_REQUIRED') {
             return { error: 'AUTH_REQUIRED' };
         }
 
-        return responseData;
+        if (!prepareData?.success || !prepareData.signed_url || !prepareData.thumbnail_path) {
+            return { error: prepareData?.error || 'No se pudo preparar la subida de la miniatura' };
+        }
+
+        try {
+            await putFileToSignedUrl(prepareData.signed_url, data.file);
+        } catch (uploadError) {
+            return {
+                error: uploadError instanceof Error
+                    ? uploadError.message
+                    : 'Error al subir la miniatura a storage',
+            };
+        }
+
+        const { data: completeData, error: completeError } = await supabase.functions.invoke('admin-storage', {
+            body: {
+                action: 'completeUploadThumbnail',
+                report_id: data.report_id,
+                thumbnail_path: prepareData.thumbnail_path,
+                file: buildFileDescriptor(data.file),
+            },
+        });
+
+        if (completeError) {
+            if (isAuthError(completeError)) {
+                return { error: 'AUTH_REQUIRED' };
+            }
+            return { error: await getErrorMessage(completeError) };
+        }
+
+        if (completeData?.error === 'AUTH_REQUIRED') {
+            return { error: 'AUTH_REQUIRED' };
+        }
+
+        return completeData;
     },
 
     listFiles: async (): Promise<{ files: AdminFileItem[] } | { error: string }> => {

@@ -1,5 +1,6 @@
 import { Box, Container, Typography, Link as MuiLink, Grid } from '@mui/material';
 import Link from 'next/link';
+import AppLogo from '@/components/layout/AppLogo';
 import EmailIcon from '@mui/icons-material/Email';
 import LinkedInIcon from '@mui/icons-material/LinkedIn';
 
@@ -10,7 +11,7 @@ export default function Footer() {
                 <Grid container spacing={4} justifyContent="space-between">
                     <Grid size={{ xs: 12, sm: 4 }}>
                         <Typography variant="h6" color="text.primary" gutterBottom>
-                            SCI
+                            <AppLogo size="sm" href={null} />
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
                             Sistema de Gestión de Reportes.

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Button, CircularProgress } from '@mui/material';
 import FacebookIcon from '@mui/icons-material/Facebook';
 import { supabase } from '@/lib/supabase';
+import { translateAuthError } from '@/lib/auth/translateAuthError';
 
 declare global {
     interface Window {
@@ -70,8 +71,8 @@ const FacebookSignInButton = ({ maxWidth = 320, onError, widthReady = true }: Fa
                 throw error;
             }
             // The redirect will happen automatically
-        } catch (error: any) {
-            onError?.(error.message || 'Error al iniciar sesión con Facebook');
+        } catch (error: unknown) {
+            onError?.(translateAuthError(error, 'Error al iniciar sesión con Facebook'));
             setLoading(false);
         }
     };
