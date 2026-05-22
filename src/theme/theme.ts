@@ -1,6 +1,13 @@
 'use client';
 
 import { createTheme } from '@mui/material/styles';
+import { Inter } from 'next/font/google';
+
+const inter = Inter({
+    weight: ['300', '400', '500', '600', '700'],
+    subsets: ['latin'],
+    display: 'swap',
+});
 
 
 const theme = createTheme({
@@ -42,7 +49,7 @@ const theme = createTheme({
         // For now mapping standard palette
     },
     typography: {
-        fontFamily: '"Times New Roman", Times, Georgia, serif',
+        fontFamily: inter.style.fontFamily,
         h1: {
             fontSize: '3rem', // 48px
             fontWeight: 700,
