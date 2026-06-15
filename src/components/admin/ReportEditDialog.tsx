@@ -423,11 +423,11 @@ export default function ReportEditDialog({ open, onClose, report, onUpdateSucces
                                             justifyContent: 'center'
                                         }}
                                     >
-                                        {thumbnailPreview ? (
+                                        {thumbnailPreview || reportMetadata.preview_url ? (
                                             <Box
                                                 component="img"
-                                                src={thumbnailPreview}
-                                                alt="Miniatura seleccionada"
+                                                src={thumbnailPreview || reportMetadata.preview_url}
+                                                alt="Miniatura del reporte"
                                                 sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                             />
                                         ) : (
